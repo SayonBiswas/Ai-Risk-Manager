@@ -1,73 +1,70 @@
 """
-FastAPI dependency that authenticates via X-API-Key header or Bearer JWT.
-Attaches merchant_id and role to request.state.
+Redis sliding-window rate limiter — FastAPI dependency.
+
+Algorithm: sorted-set per API key.
+  - Key:   rate_limit:<identifier>
+  - Score: Unix timestamp (float) of each request
+  - On each request:
+      1. Remove scores older than the window
+      2. Count remaining members
+      3. If count >= limit → 429
+      4. Else add current timestamp and set expiry
 """
 
+import time
+
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from redis.asyncio import Redis
 
-from app.core.security import decode_jwt, verify_api_key
-from app.db.session import get_db
+from app.core.config import get_settings
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-bearer_scheme = HTTPBearer(auto_error=False)
+settings = get_settings()
 
-UNAUTHORIZED = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid or missing credentials",
+RATE_EXCEEDED = HTTPException(
+    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    detail="Rate limit exceeded — try again later.",
+    headers={"Retry-After": str(settings.rate_limit_window_seconds)},
 )
 
 
-async def get_current_merchant(
-    request: Request,
-    api_key: str | None = Depends(api_key_header),
-    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
+async def rate_limit(request: Request) -> None:
     """
-    Accepts X-API-Key header OR Authorization: Bearer <jwt>.
-    Returns {"merchant_id": ..., "role": ...} and sets request.state.
+    Sliding-window rate limiter: 100 requests per 60 seconds per API key / IP.
+    Raises HTTP 429 with Retry-After header when the limit is exceeded.
+    Silently skips if Redis is unavailable (fail-open for resilience).
     """
-    # ── JWT path ──────────────────────────────────────────────────────────────
-    if bearer:
-        payload = decode_jwt(bearer.credentials)
-        if not payload:
-            raise UNAUTHORIZED
-        request.state.merchant_id = payload.get("merchant_id")
-        request.state.role = payload.get("role", "MERCHANT")
-        return {"merchant_id": request.state.merchant_id, "role": request.state.role}
+    redis: Redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return  # Redis not configured — skip limiting
 
-    # ── API key path ──────────────────────────────────────────────────────────
-    if api_key:
-        # Import here to avoid circular import before models exist
-        from app.db.models import Merchant  # noqa: PLC0415
+    # Use merchant_id from state if auth already ran, else fall back to client IP
+    identifier = getattr(getattr(request, "state", None), "merchant_id", None)
+    if not identifier:
+        identifier = request.client.host if request.client else "unknown"
 
-        result = await db.execute(select(Merchant).where(Merchant.is_active == True))  # noqa: E712
-        merchants = result.scalars().all()
+    key = f"rate_limit:{identifier}"
+    now = time.time()
+    window_start = now - settings.rate_limit_window_seconds
 
-        for merchant in merchants:
-            if verify_api_key(api_key, merchant.api_key_hash):
-                request.state.merchant_id = str(merchant.id)
-                request.state.role = merchant.role.value
-                return {
-                    "merchant_id": str(merchant.id),
-                    "role": merchant.role.value,
-                }
+    try:
+        pipe = redis.pipeline()
+        # Remove timestamps outside the current window
+        pipe.zremrangebyscore(key, "-inf", window_start)
+        # Add current request timestamp (member = timestamp string for uniqueness)
+        pipe.zadd(key, {str(now): now})
+        # Count requests in window
+        pipe.zcard(key)
+        # Reset TTL on the key
+        pipe.expire(key, settings.rate_limit_window_seconds)
 
-    raise UNAUTHORIZED
+        results = await pipe.execute()
+        request_count = results[2]  # zcard result
 
+        if request_count > settings.rate_limit_requests:
+            raise RATE_EXCEEDED
 
-async def require_role(*roles: str):
-    """
-    Factory dependency — checks that the authenticated merchant has one of the given roles.
-
-    Usage:
-        Depends(require_role("ADMIN", "ANALYST"))
-    """
-    async def _check(current: dict = Depends(get_current_merchant)):
-        if current["role"] not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-        return current
-    return _check
+    except HTTPException:
+        raise
+    except Exception:
+        # Redis error — fail open (don't block legitimate traffic)
+        pass

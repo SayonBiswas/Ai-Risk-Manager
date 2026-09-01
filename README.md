@@ -1,7 +1,7 @@
 # AI Risk Manager — Razorpay Buildathon Track 02
-### Stop the merchant losing money to fraud, returns and chargebacks[cite: 1]
+### Stop the merchant losing money to fraud, returns and chargebacks
 
-*Track 02 · Razorpay /buildathon · Defense-only · No offense-capable features*[cite: 1]
+*Track 02 · Razorpay /buildathon · Defense-only · No offense-capable features*
 
 ---
 
@@ -30,6 +30,7 @@
   ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐
   │  /v1/fraud    │ │ /v1/chargeback│ │  /v1/returns     │
   │   detect      │ │   respond    │ │    score         │
+  │               │ │   /status    │ │                   │
   └───────┬───────┘ └──────┬───────┘ └────────┬─────────┘
           │                │                  │
           └────────────────┼──────────────────┘
@@ -38,7 +39,20 @@
               │    RISK ENGINE CORE    │
               │  (Python ML Pipeline)  │
               └──────────┬─────────────┘
-```[cite: 1]
+                           │
+          ┌────────────────┼─────────────────┐
+          ▼                ▼                 ▼
+  ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐
+  │ Fraud Detector│ │ Return Scorer│ │ Chargeback Risk  │
+  │   (XGBoost)   │ │  (LightGBM)  │ │  (IsoForest+LR)  │
+  └───────────────┘ └──────────────┘ └──────────────────┘
+                           │
+                           ▼
+              ┌────────────────────────┐
+              │   LLM Reasoner (Gemini) │
+              │   Evidence Generation   │
+              └────────────────────────┘
+```
 
 ---
 

@@ -1,30 +1,45 @@
-# Web Framework & Server
+# ── Web Framework & Server ────────────────────────────────────────────────────
 fastapi==0.109.2
 uvicorn[standard]==0.27.1
 
-# Database & ORM
+# ── Database & ORM ────────────────────────────────────────────────────────────
 sqlalchemy==2.0.25
 asyncpg==0.29.0
 alembic==1.13.1
 
-# Caching & Rate Limiting (aioredis is now integrated into redis-py >= 4.2.0)
+# ── Cache & Rate Limiting ─────────────────────────────────────────────────────
 redis==5.0.1
 
-# Data Validation & Settings
+# ── Data Validation & Settings ────────────────────────────────────────────────
 pydantic==2.6.1
 pydantic-settings==2.1.0
 
-# Security (JWT & Hashing)
+# ── Security ──────────────────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
-# Logging
-structlog==24.1.0
-
-# Testing
-pytest==8.0.0
-pytest-asyncio==0.23.5
+# ── HTTP Client (LLM + Webhooks) ──────────────────────────────────────────────
 httpx==0.26.0
 
-numpy
-pandas
+# ── Retry logic ───────────────────────────────────────────────────────────────
+tenacity==8.2.3
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+structlog==24.1.0
+
+# ── ML — Core ─────────────────────────────────────────────────────────────────
+numpy==1.26.4
+pandas==2.2.0
+scikit-learn==1.4.0
+joblib==1.3.2
+
+# ── ML — Boosting Models ──────────────────────────────────────────────────────
+xgboost==2.0.3
+lightgbm==4.3.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.0.0
+pytest-asyncio==0.23.5
+pytest-cov==4.1.0
+respx==0.20.2
+aiosqlite==0.20.0
