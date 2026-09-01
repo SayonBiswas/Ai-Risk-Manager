@@ -1,6 +1,7 @@
 # Environments & Secrets
 .env
 .env.*
+alembic.ini
 !.env.example
 .venv/
 venv/
