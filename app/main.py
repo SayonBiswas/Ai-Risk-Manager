@@ -52,7 +52,8 @@ app.add_middleware(
 )
 
 # ── Audit logger middleware ───────────────────────────────────────────────────
-app.add_middleware(AuditLoggerMiddleware)
+# Temporarily disabled due to response handling issues
+# app.add_middleware(AuditLoggerMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health_router)

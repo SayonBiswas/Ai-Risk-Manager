@@ -7,18 +7,23 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+import ssl
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
 # ── Engine ────────────────────────────────────────────────────────────────────
+# Configure SSL for Neon database (PostgreSQL over SSL)
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     pool_pre_ping=True,      # drop stale connections before use
     pool_size=10,
     max_overflow=20,
+    connect_args={
+        "ssl": ssl.create_default_context()
+    }
 )
 
 # ── Session factory ───────────────────────────────────────────────────────────

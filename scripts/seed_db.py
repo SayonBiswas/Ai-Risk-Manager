@@ -7,13 +7,24 @@ Prints the raw API key — save it for testing.
 import asyncio
 import sys
 import os
+import hashlib
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db.session import AsyncSessionLocal
 from app.db.models import Merchant, RoleEnum
-from app.core.security import generate_api_key, hash_api_key
 import uuid
+import secrets
+
+
+def generate_api_key() -> str:
+    """Generate a secure API key."""
+    return f"riskmgr_{secrets.token_urlsafe(32)}"
+
+
+def hash_api_key(api_key: str) -> str:
+    """Simple hash for API key (SHA-256)."""
+    return hashlib.sha256(api_key.encode()).hexdigest()
 
 
 async def seed() -> None:

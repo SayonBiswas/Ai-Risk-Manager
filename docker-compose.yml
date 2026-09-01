@@ -11,21 +11,22 @@ services:
     volumes:
       - ./app:/app/app
     depends_on:
-      - postgres
       - redis
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: ai_risk_manager_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_db_password}
-      POSTGRES_DB: ${POSTGRES_DB:-risk_manager}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  # Using Neon PostgreSQL (cloud) instead of local postgres
+  # Remove this service if using Neon database
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: ai_risk_manager_db
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_db_password}
+  #     POSTGRES_DB: ${POSTGRES_DB:-risk_manager}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -33,5 +34,5 @@ services:
     ports:
       - "6379:6379"
 
-volumes:
-  postgres_data:
+# volumes:
+#   postgres_data:

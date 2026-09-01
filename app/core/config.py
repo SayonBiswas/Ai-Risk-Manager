@@ -19,11 +19,15 @@ class Settings(BaseSettings):
     allowed_origins: str = Field("*", alias="ALLOWED_ORIGINS")
 
     # ── Database ──────────────────────────────────────────────────────────────
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_SERVER: str
+    # Direct connection string (takes precedence if provided)
+    database_url_direct: str = Field("", alias="DATABASE_URL")
+
+    # Individual settings (used if DATABASE_URL not provided)
+    POSTGRES_USER: str = ""
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_SERVER: str = ""
     POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str
+    POSTGRES_DB: str = ""
 
     # ── Redis ─────────────────────────────────────────────────────────────────
     redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
@@ -37,9 +41,9 @@ class Settings(BaseSettings):
     model_dir: str = Field("app/ml/models", alias="MODEL_DIR")
     model_version: str = Field("1.0.0", alias="MODEL_VERSION")
 
-    # ── LLM (Anthropic Claude) ────────────────────────────────────────────────
-    anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
-    anthropic_model: str = Field("claude-sonnet-4-6", alias="ANTHROPIC_MODEL")
+    # ── LLM (Google Gemini) ───────────────────────────────────────────────────
+    gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-1.5-flash", alias="GEMINI_MODEL")
 
     # ── Webhooks ──────────────────────────────────────────────────────────────
     webhook_timeout_seconds: float = Field(5.0, alias="WEBHOOK_TIMEOUT_SECONDS")
@@ -52,6 +56,18 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def database_url(self) -> str:
+        # Use direct DATABASE_URL if provided (for Neon, etc.)
+        if self.database_url_direct:
+            # Convert postgresql:// to postgresql+asyncpg:// for async operations
+            url = self.database_url_direct
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://")
+            return url
+
+        # Otherwise construct from individual settings
+        if not all([self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_SERVER, self.POSTGRES_DB]):
+            raise ValueError("Either DATABASE_URL or individual POSTGRES_* settings must be provided")
+
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -69,6 +85,7 @@ class Settings(BaseSettings):
         case_sensitive=False,   # allows both REDIS_URL and redis_url to match
         populate_by_name=True,  # allow access by field name AND alias
         extra="ignore",
+        protected_namespaces=(),  # Allow all field names including model_
     )
 
 

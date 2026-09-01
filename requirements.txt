@@ -5,6 +5,7 @@ uvicorn[standard]==0.27.1
 # ── Database & ORM ────────────────────────────────────────────────────────────
 sqlalchemy==2.0.25
 asyncpg==0.29.0
+psycopg2-binary==2.9.12
 alembic==1.13.1
 
 # ── Cache & Rate Limiting ─────────────────────────────────────────────────────
@@ -20,6 +21,7 @@ passlib[bcrypt]==1.7.4
 
 # ── HTTP Client (LLM + Webhooks) ──────────────────────────────────────────────
 httpx==0.26.0
+google-generativeai==0.8.3
 
 # ── Retry logic ───────────────────────────────────────────────────────────────
 tenacity==8.2.3

@@ -1,0 +1,73 @@
+services:
+  - type: web
+    name: ai-risk-manager-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: PROJECT_NAME
+        value: AI Risk Manager
+      - key: VERSION
+        value: 1.0.0
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://your-frontend.vercel.app
+      # Neon Database Configuration
+      - key: DATABASE_URL
+        sync: false
+      # Legacy individual settings (for compatibility)
+      - key: POSTGRES_USER
+        value: neondb_owner
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_SERVER
+        sync: false
+      - key: POSTGRES_PORT
+        value: 5432
+      - key: POSTGRES_DB
+        value: neondb
+      # Redis Configuration (will be auto-assigned by Render Redis)
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-risk-manager-redis
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_MINUTES
+        value: 60
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: MODEL_DIR
+        value: app/ml/models
+      - key: MODEL_VERSION
+        value: 1.0.0
+      - key: WEBHOOK_TIMEOUT_SECONDS
+        value: 5.0
+      - key: RATE_LIMIT_REQUESTS
+        value: 100
+      - key: RATE_LIMIT_WINDOW_SECONDS
+        value: 60
+
+  # Redis for caching and rate limiting
+  - type: redis
+    name: ai-risk-manager-redis
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+# Using Neon PostgreSQL instead of Render's built-in database
+# Remove this section if using Neon
+# databases:
+#   - name: ai-risk-manager-db
+#     databaseName: risk_manager
+#     user: postgres
+#     plan: free

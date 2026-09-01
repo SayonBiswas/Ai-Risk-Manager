@@ -3,28 +3,30 @@ API key and JWT utilities.
 """
 
 import uuid
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import get_settings
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_api_key(raw_key: str) -> str:
-    return pwd_context.hash(raw_key)
+    """Simple hash for API key (SHA-256)."""
+    return hashlib.sha256(raw_key.encode()).hexdigest()
 
 
 def verify_api_key(raw_key: str, hashed: str) -> bool:
-    return pwd_context.verify(raw_key, hashed)
+    """Verify API key against hash."""
+    return hash_api_key(raw_key) == hashed
 
 
 def generate_api_key() -> str:
-    """Generate a UUID-based raw API key."""
-    return f"rm_{uuid.uuid4().hex}"
+    """Generate a secure API key."""
+    return f"riskmgr_{secrets.token_urlsafe(32)}"
 
 
 def create_jwt(data: dict, expires_minutes: int | None = None) -> str:
