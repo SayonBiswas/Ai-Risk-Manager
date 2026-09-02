@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #13131b;
+  color: #e4e1ed;
+}
+
+.glass-panel {
+  background: rgba(52,52,61,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.data-card {
+  background: rgba(52,52,61,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+
+.status-chip-block {
+  background: rgba(255,180,171,0.1);
+  color: #ffb4ab;
+  border: 1px solid rgba(255,180,171,0.3);
+}
+
+.status-chip-flag {
+  background: rgba(255,185,95,0.1);
+  color: #ffb95f;
+  border: 1px solid rgba(255,185,95,0.3);
+}
+
+.status-chip-allow {
+  background: rgba(78,222,163,0.1);
+  color: #4edea3;
+  border: 1px solid rgba(78,222,163,0.3);
+}
