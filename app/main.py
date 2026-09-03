@@ -18,6 +18,8 @@ from app.api.v1.health import router as health_router
 from app.api.v1.fraud import router as fraud_router
 from app.api.v1.chargebacks import router as chargebacks_router
 from app.api.v1.returns import router as returns_router
+from app.api.v1.auth import router as auth_router
+from app.api.v1.api_keys import router as api_keys_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.audit_logger import AuditLoggerMiddleware
@@ -60,6 +62,8 @@ app.include_router(health_router)
 app.include_router(fraud_router,       prefix="/v1/fraud",       tags=["Fraud"])
 app.include_router(chargebacks_router, prefix="/v1/chargebacks", tags=["Chargebacks"])
 app.include_router(returns_router,     prefix="/v1/returns",     tags=["Returns"])
+app.include_router(auth_router,        prefix="/auth",          tags=["Auth"])
+app.include_router(api_keys_router,    prefix="/api-keys",      tags=["API Keys"])
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")

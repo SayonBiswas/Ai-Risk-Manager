@@ -17,18 +17,18 @@ depends_on = None
 
 def upgrade() -> None:
     # ── Enums ─────────────────────────────────────────────────────────────────
-    role_enum = postgresql.ENUM("MERCHANT", "ANALYST", "ADMIN", name="role_enum")
-    decision_enum = postgresql.ENUM("ALLOW", "FLAG", "BLOCK", name="decision_enum")
-    role_enum.create(op.get_bind(), checkfirst=True)
-    decision_enum.create(op.get_bind(), checkfirst=True)
+    # Skip enum creation - they should already exist in the database
+    # If they don't exist, the table creation will fail and you can create them manually
 
     # ── merchants ─────────────────────────────────────────────────────────────
     op.create_table(
         "merchants",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False),
+        sa.Column("email", sa.String(255), nullable=False),
+        sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column("api_key_hash", sa.String(255), nullable=False),
-        sa.Column("role", sa.Enum("MERCHANT", "ANALYST", "ADMIN", name="role_enum"), nullable=False),
+        sa.Column("role", sa.String(20), nullable=False),  # Use string instead of enum
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("webhook_url", sa.String(500), nullable=True),
         sa.Column("webhook_secret", sa.String(255), nullable=True),
@@ -39,6 +39,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
+    op.create_index("ix_merchants_email", "merchants", ["email"], unique=True)
 
     # ── transactions ──────────────────────────────────────────────────────────
     op.create_table(
@@ -71,7 +72,7 @@ def upgrade() -> None:
         "risk_decisions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("transaction_id", postgresql.UUID(as_uuid=True), nullable=False, unique=True),
-        sa.Column("decision", sa.Enum("ALLOW", "FLAG", "BLOCK", name="decision_enum"), nullable=False),
+        sa.Column("decision", sa.String(10), nullable=False),  # Use string instead of enum
         sa.Column("fraud_score", sa.Numeric(5, 4), nullable=False),
         sa.Column("return_risk_score", sa.Numeric(5, 4), nullable=False),
         sa.Column("chargeback_risk_score", sa.Numeric(5, 4), nullable=False),
@@ -111,9 +112,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("ix_merchants_email", table_name="merchants")
     op.drop_table("audit_logs")
     op.drop_table("risk_decisions")
     op.drop_table("transactions")
     op.drop_table("merchants")
-    op.execute("DROP TYPE IF EXISTS decision_enum")
-    op.execute("DROP TYPE IF EXISTS role_enum")
+    op.execute("DROP TYPE IF EXISTS decision_enum CASCADE")
+    op.execute("DROP TYPE IF EXISTS role_enum CASCADE")
