@@ -14,10 +14,12 @@ redis==5.0.1
 # ── Data Validation & Settings ────────────────────────────────────────────────
 pydantic==2.6.1
 pydantic-settings==2.1.0
+email-validator==2.3.0
 
 # ── Security ──────────────────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # ── HTTP Client (LLM + Webhooks) ──────────────────────────────────────────────
 httpx==0.26.0

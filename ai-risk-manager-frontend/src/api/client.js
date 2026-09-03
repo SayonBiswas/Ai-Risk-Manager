@@ -1,36 +1,27 @@
 import axios from 'axios';
 
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+const client = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add API key from localStorage
-apiClient.interceptors.request.use(
-  (config) => {
-    const apiKey = localStorage.getItem('rm_api_key');
-    if (apiKey) {
-      config.headers['X-API-Key'] = apiKey;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle 401 errors
-apiClient.interceptors.response.use(
+// Response interceptor for handling 401 errors
+client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('rm_api_key');
+    if (error.response?.status === 401) {
+      // Clear authentication data
+      localStorage.removeItem('rm_jwt');
+      localStorage.removeItem('rm_active_api_key');
+      localStorage.removeItem('rm_user');
+      
+      // Redirect to login
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-export default apiClient;
+export default client;
