@@ -68,4 +68,4 @@ Thumbs.db
 *.swo
 
 # Docker
-.dockerignore
+.dockerignore!app/ml/models/*.joblib
