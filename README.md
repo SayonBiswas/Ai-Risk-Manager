@@ -1,11 +1,19 @@
-# AI Risk Manager — Razorpay Buildathon Track 02
-### Stop the merchant losing money to fraud, returns and chargebacks
-
-*Track 02 · Razorpay /buildathon · Defense-only · No offense-capable features*
+# AI Risk Manager
+### Razorpay Buildathon · Track 02 · AI-powered fraud, returns & chargeback protection
 
 ---
 
-## 📐 Project Architecture
+## What It Does
+
+AI Risk Manager is a real-time transaction risk scoring platform built for merchants. It protects against three types of financial loss:
+
+- **Fraud** — XGBoost classifier scores every transaction before it's approved
+- **Return Risk** — LightGBM model predicts the probability a transaction will be returned
+- **Chargebacks** — Isolation Forest + Logistic Regression flags chargeback risk, and Google Gemini generates AI dispute evidence packages automatically
+
+---
+
+## Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -28,67 +36,63 @@
           ┌────────────────┼─────────────────┐
           ▼                ▼                 ▼
   ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐
-  │  /v1/fraud    │ │ /v1/chargeback│ │  /v1/returns     │
+  │  /v1/fraud    │ │/v1/chargeback│ │  /v1/returns     │
   │   detect      │ │   respond    │ │    score         │
-  │               │ │   /status    │ │                   │
   └───────┬───────┘ └──────┬───────┘ └────────┬─────────┘
-          │                │                  │
           └────────────────┼──────────────────┘
                            ▼
               ┌────────────────────────┐
               │    RISK ENGINE CORE    │
               │  (Python ML Pipeline)  │
               └──────────┬─────────────┘
-                           │
-          ┌────────────────┼─────────────────┐
-          ▼                ▼                 ▼
-  ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐
-  │ Fraud Detector│ │ Return Scorer│ │ Chargeback Risk  │
-  │   (XGBoost)   │ │  (LightGBM)  │ │  (IsoForest+LR)  │
-  └───────────────┘ └──────────────┘ └──────────────────┘
-                           │
-                           ▼
+                         │
+          ┌──────────────┼──────────────────┐
+          ▼              ▼                  ▼
+  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+  │Fraud Detector│ │Return Scorer │ │ Chargeback Risk  │
+  │  (XGBoost)   │ │ (LightGBM)   │ │ (IsoForest + LR) │
+  └──────────────┘ └──────────────┘ └──────────────────┘
+                         │
+                         ▼
               ┌─────────────────────────┐
-              │   LLM Reasoner (Gemini)  │
-              │   Evidence Generation    │
+              │  LLM Reasoner (Gemini)  │
+              │  Evidence Generation    │
               └─────────────────────────┘
 ```
 
 ---
 
-## 🧰 Tech Stack Summary
+## Tech Stack
 
 | Layer | Technology | Purpose |
 |---|---|---|
 | API Framework | FastAPI (Python 3.11) | Async REST API |
 | Data Validation | Pydantic v2 | Request/response schemas |
-| Database | PostgreSQL 15 + asyncpg | Persistent storage |
-| ORM | SQLAlchemy 2.0 (async) | DB access layer |
+| Database | PostgreSQL 15 + asyncpg (Neon) | Persistent storage |
+| ORM | SQLAlchemy 2.0 async | DB access layer |
 | Migrations | Alembic | Schema versioning |
 | Cache / Rate Limit | Redis 7 + aioredis | Speed + throttling |
 | ML — Fraud | XGBoost | Fraud classification |
 | ML — Returns | LightGBM | Return risk scoring |
-| ML — Chargebacks | Isolation Forest + LR | Anomaly + scoring |
-| Data Processing | Pandas, NumPy, scikit-learn | Feature engineering |
-| LLM | Google Gemini API | Reason generation |
-| HTTP Client | httpx (async) | External API calls |
-| Auth | JWT (python-jose) + bcrypt | Security |
+| ML — Chargebacks | Isolation Forest + LR | Anomaly detection |
+| LLM | Google Gemini API | Reason + evidence generation |
+| Auth | JWT + bcrypt | Security |
 | Logging | structlog | JSON structured logs |
-| Containerization | Docker + Docker Compose | Dev & deployment |
-| Testing | pytest + pytest-asyncio + respx | Test suite |[cite: 1]
+| Frontend | React 18 + Vite + Tailwind | Dashboard UI |
+| Containerization | Docker | Dev & deployment |
 
 ---
 
-## ⚡ Quick Start
+## Quick Start (Local)
 
 ```bash
 # 1. Clone and setup
 git clone <your-repo>
 cd ai-risk-manager
 cp .env.example .env
-# Fill in your GEMINI_API_KEY and DB credentials in .env
+# Fill in GEMINI_API_KEY and DATABASE_URL in .env
 
-# 2. Start infrastructure (Redis only - PostgreSQL is Neon cloud)
+# 2. Start Redis (PostgreSQL is Neon cloud — no local instance needed)
 docker-compose up -d redis
 
 # 3. Install dependencies
@@ -103,117 +107,115 @@ python scripts/seed_db.py
 # 6. Train ML models
 python scripts/train_models.py
 
-# 7. Evaluate models (check precision/recall)
-python scripts/evaluate_models.py
-
-# 8. Start the API
+# 7. Start the API
 uvicorn app.main:app --reload --port 8000
 
-# 9. Run tests
-pytest tests/ -v --cov=app --cov-report=html
-
-# 10. View API docs
-open http://localhost:8000/docs
-```
-
----
-
-## 🗄️ Database Setup (Neon PostgreSQL)
-
-This project uses **Neon PostgreSQL** as the cloud database. Here's how to set it up:
-
-### Getting Your Neon Connection String
-
-1. Go to [neon.tech](https://neon.tech) and create a free account
-2. Create a new project
-3. Copy your connection string from the Neon dashboard
-4. Add your password to the connection string
-
-### Configuring the Application
-
-Add your Neon connection string to your `.env` file:
-
-```bash
-# Neon Database Connection
-DATABASE_URL=postgresql://neondb_owner:YOUR_PASSWORD@ep-xxx.region.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-```
-
-### Benefits of Using Neon
-
-- **Serverless**: Auto-scaling PostgreSQL
-- **Free tier**: Generous free tier for development
-- **Branching**: Database branching for development/testing
-- **Connection pooling**: Built-in connection pooling
-- **Global**: Low latency with global deployment
-
-### Running Migrations with Neon
-
-The application is configured to work seamlessly with Neon. Just run:
-
-```bash
-alembic upgrade head
-```
-
-The migrations will be applied directly to your Neon database.
-
----
-
-## 🚀 Deployment
-
-### Backend (Render with Neon Database)
-
-1. **Set up Neon Database:**
-   - Create a free account at [neon.tech](https://neon.tech)
-   - Create a new PostgreSQL project
-   - Copy your connection string (format: `postgresql://neondb_owner:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`)
-
-2. **Configure Render:**
-   - Create a new account on [render.com](https://render.com)
-   - Connect your GitHub repository
-   - Create a new Web Service using the `render.yaml` configuration
-   - Set the required environment variables in the Render dashboard:
-     - `DATABASE_URL` (your Neon connection string with password)
-     - `GEMINI_API_KEY` (get from [Google AI Studio](https://aistudio.google.com/app/apikey))
-     - `SECRET_KEY` (generate with `openssl rand -hex 32`)
-     - `ALLOWED_ORIGINS` (set to your Vercel frontend URL)
-   - The `render.yaml` will automatically create a Redis instance for caching
-3. Deploy and wait for the build to complete
-
-### Frontend (Vercel)
-
-1. Create a new account on [vercel.com](https://vercel.com)
-2. Import the `frontend/` directory
-3. Set the `VITE_API_URL` environment variable to your Render backend URL
-4. Deploy
-
-### Local Testing with Frontend
-
-```bash
-# Terminal 1: Start Redis (Neon DB is cloud-hosted)
-docker-compose up -d redis
-
-# Terminal 2: Start backend
-cd ai-risk-manager
-uvicorn app.main:app --reload --port 8000
-
-# Terminal 3: Start frontend
-cd frontend
+# 8. Start the frontend
+cd ai-risk-manager-frontend
+npm install
+cp .env.example .env
+# Set VITE_API_BASE_URL=http://localhost:8000
 npm run dev
+
+# Open http://localhost:5173
 ```
-
-Open http://localhost:5173 to test the UI.
-
-**Note:** Since we're using Neon PostgreSQL (cloud database), you don't need to run a local PostgreSQL instance. Just ensure your `.env` file has the correct `DATABASE_URL` with your Neon password.
-
----[cite: 1]
 
 ---
 
-## 📊 Evaluation Metrics
+## API Endpoints
 
-The system will report on the following metrics against a held-out test set of 10,000 transactions[cite: 1]:
-*   **Precision & Recall**[cite: 1]
-*   **F1 Score**[cite: 1]
-*   **ROC-AUC**[cite: 1]
-*   **False Positive Rate**[cite: 1]
-*   **False Positive Cost:** Total ₹ value of legitimate revenue incorrectly blocked by the model[cite: 1].
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/health` | None | Liveness check |
+| POST | `/auth/register` | None | Create account |
+| POST | `/auth/login` | None | Login, get JWT |
+| GET | `/auth/me` | Bearer JWT | Current user info |
+| POST | `/api-keys/generate` | Bearer JWT | Generate API key |
+| GET | `/api-keys` | Bearer JWT | View key status |
+| POST | `/v1/fraud/detect` | X-API-Key | Full risk scoring |
+| POST | `/v1/returns/score` | X-API-Key | Return risk only |
+| POST | `/v1/chargebacks/respond` | X-API-Key | Generate dispute evidence |
+| GET | `/v1/chargebacks/{id}/status` | X-API-Key | Dispute status |
+
+---
+
+## User Flow
+
+```
+1. Register → POST /auth/register → get JWT + initial API key
+2. Login → POST /auth/login → get JWT
+3. API Keys → POST /api-keys/generate → store key in browser
+4. Dashboard → all risk calls use X-API-Key header
+     ├── Fraud Detect → POST /v1/fraud/detect
+     ├── Return Scorer → POST /v1/returns/score
+     └── Chargebacks → POST /v1/chargebacks/respond
+```
+
+---
+
+## Environment Variables
+
+```bash
+# Backend (.env)
+PROJECT_NAME=AI Risk Manager
+VERSION=1.0.0
+DEBUG=false
+DATABASE_URL=postgresql://user:pass@host/db   # Neon connection string
+REDIS_URL=redis://localhost:6379/0
+SECRET_KEY=                                    # openssl rand -hex 32
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_MINUTES=60
+GEMINI_API_KEY=                                # aistudio.google.com
+GEMINI_MODEL=gemini-1.5-flash
+MODEL_DIR=app/ml/models
+MODEL_VERSION=1.0.0
+ALLOWED_ORIGINS=http://localhost:5173
+
+# Frontend (.env)
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+---
+
+## Deployment
+
+**Backend → Render**
+- Docker deploy, connect GitHub repo
+- Add all env vars in Render dashboard
+- Run `alembic upgrade head` in Render Shell after first deploy
+- Free tier: 750 hrs/month (enough for one always-on service)
+
+**Frontend → Vercel**
+- Import repo, framework preset: Vite
+- Set `VITE_API_BASE_URL` to your Render URL
+- `vercel.json` handles SPA routing automatically
+
+**Database → Neon PostgreSQL**
+- Free serverless PostgreSQL, no local instance needed
+- Just set `DATABASE_URL` in your env and run migrations
+
+---
+
+## Evaluation Metrics
+
+Measured against a held-out test set of 10,000 transactions:
+
+- Precision & Recall
+- F1 Score
+- ROC-AUC
+- False Positive Rate
+- False Positive Cost (₹ value of legitimate transactions incorrectly blocked)
+
+---
+
+## Important Rules
+
+- `amount` must always be sent as a string `"1500.00"` not a number
+- `payment_method` must be exactly one of `card` · `upi` · `netbanking` · `wallet`
+- All `/v1/*` calls use `X-API-Key` header — not Bearer JWT
+- Chargeback lookup requires the transaction was first sent through `/v1/fraud/detect` with `metadata: { transaction_id: "..." }` in the body
+- Never commit `.env` to git
+
+---
+
+*AI Risk Manager · Razorpay Buildathon · Track 02*
