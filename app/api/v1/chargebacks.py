@@ -150,14 +150,17 @@ async def _find_transaction(
     merchant_id: str,
 ) -> Transaction | None:
     """
-    Look up a transaction by external transaction_id stored in metadata.
-    Falls back to matching customer_id for demo purposes.
+    Look up the most recent transaction matching the external transaction_id
+    stored in metadata. Returns latest if duplicates exist (e.g. from retesting).
     """
     result = await db.execute(
-        select(Transaction).where(
+        select(Transaction)
+        .where(
             Transaction.merchant_id == uuid.UUID(merchant_id),
             Transaction.metadata_["transaction_id"].astext == transaction_id,
         )
+        .order_by(Transaction.created_at.desc())
+        .limit(1)
     )
     return result.scalar_one_or_none()
 

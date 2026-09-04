@@ -10,8 +10,10 @@ Render start command:
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 
 from app.api.v1.health import router as health_router
@@ -42,9 +44,7 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# ── CORS ─────────────────────────────────────────────────────────────────────
-# ALLOWED_ORIGINS env var controls which frontends can call this API.
-# Add your Vercel / Netlify URL there — no code change needed.
+# ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
@@ -57,19 +57,41 @@ app.add_middleware(
 # Temporarily disabled due to response handling issues
 # app.add_middleware(AuditLoggerMiddleware)
 
+# ── Validation error handler — logs exact failing field to terminal ───────────
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    body = await request.body()
+    logger.error(
+        "validation_error",
+        errors=errors,
+        raw_body=body.decode("utf-8", errors="replace"),
+        path=str(request.url),
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health_router)
 app.include_router(fraud_router,       prefix="/v1/fraud",       tags=["Fraud"])
 app.include_router(chargebacks_router, prefix="/v1/chargebacks", tags=["Chargebacks"])
 app.include_router(returns_router,     prefix="/v1/returns",     tags=["Returns"])
-app.include_router(auth_router,        prefix="/auth",          tags=["Auth"])
-app.include_router(api_keys_router,    prefix="/api-keys",      tags=["API Keys"])
+app.include_router(auth_router,        prefix="/auth",           tags=["Auth"])
+app.include_router(api_keys_router,    prefix="/api-keys",       tags=["API Keys"])
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup() -> None:
-    # Connect Redis
-    app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    # Connect Redis — optional, app works without it (no caching)
+    try:
+        app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        await app.state.redis.ping()
+        logger.info("redis_connected", url=settings.redis_url)
+    except Exception as exc:
+        logger.warning("redis_unavailable_cache_disabled", error=str(exc))
+        app.state.redis = None
 
     # Load ML models into memory
     load_all_models()
@@ -85,5 +107,6 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
-    await app.state.redis.aclose()
+    if app.state.redis:
+        await app.state.redis.aclose()
     logger.info("shutdown", app=settings.app_name)

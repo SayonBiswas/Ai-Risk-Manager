@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # ── LLM (Google Gemini) ───────────────────────────────────────────────────
     gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
-    gemini_model: str = Field("gemini-1.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field("gemini-3.1-flash-lite", alias="GEMINI_MODEL")
 
     # ── Webhooks ──────────────────────────────────────────────────────────────
     webhook_timeout_seconds: float = Field(5.0, alias="WEBHOOK_TIMEOUT_SECONDS")

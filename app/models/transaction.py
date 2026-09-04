@@ -4,7 +4,7 @@ Pydantic v2 request and response schemas for all API endpoints.
 
 import ipaddress
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,10 +23,10 @@ def _validate_ip(v: str) -> str:
 # ── Transaction Request ───────────────────────────────────────────────────────
 
 class TransactionRequest(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=False)
 
     transaction_id: str = Field(..., min_length=1, max_length=255)
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    amount: Decimal = Field(..., gt=0)
     currency: str = Field(..., min_length=3, max_length=3)
     customer_id: str = Field(..., min_length=1, max_length=255)
     payment_method: Literal["card", "upi", "netbanking", "wallet"]
@@ -35,6 +35,14 @@ class TransactionRequest(BaseModel):
     merchant_category_code: str = Field(..., min_length=1, max_length=10)
     is_international: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def validate_amount(cls, v: Any) -> Decimal:
+        try:
+            return Decimal(str(v))
+        except InvalidOperation:
+            raise ValueError(f"Invalid amount: {v}")
 
     @field_validator("ip_address")
     @classmethod
@@ -47,14 +55,6 @@ class TransactionRequest(BaseModel):
         if not v.isalpha():
             raise ValueError("Currency must contain only letters (e.g. INR, USD)")
         return v.upper()
-
-    @field_validator("amount", mode="before")
-    @classmethod
-    def validate_amount(cls, v: Any) -> Any:
-        # Accept string representations like "100.50"
-        if isinstance(v, str):
-            return Decimal(v)
-        return v
 
 
 # ── Risk Score Response ───────────────────────────────────────────────────────
@@ -76,24 +76,34 @@ class RiskScoreResponse(BaseModel):
 # ── Chargeback Schemas ────────────────────────────────────────────────────────
 
 class ChargebackEvidenceRequest(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=False)
 
     transaction_id: str = Field(..., min_length=1, max_length=255)
     chargeback_reason_code: str = Field(..., min_length=1, max_length=50)
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    amount: Decimal = Field(..., gt=0)
     dispute_deadline: date
 
     @field_validator("amount", mode="before")
     @classmethod
-    def validate_amount(cls, v: Any) -> Any:
+    def validate_amount(cls, v: Any) -> Decimal:
+        try:
+            return Decimal(str(v))
+        except InvalidOperation:
+            raise ValueError(f"Invalid amount: {v}")
+
+    @field_validator("dispute_deadline", mode="before")
+    @classmethod
+    def validate_deadline_format(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return Decimal(v)
+            try:
+                return date.fromisoformat(v)
+            except ValueError:
+                raise ValueError("dispute_deadline must be YYYY-MM-DD format")
         return v
 
     @model_validator(mode="after")
     def validate_deadline_not_past(self) -> "ChargebackEvidenceRequest":
-        from datetime import date as date_
-        if self.dispute_deadline < date_.today():
+        if self.dispute_deadline < date.today():
             raise ValueError("dispute_deadline cannot be in the past")
         return self
 

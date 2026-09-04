@@ -194,7 +194,7 @@ async def _persist(
         ip_address=body.ip_address,
         merchant_category_code=body.merchant_category_code,
         is_international=body.is_international,
-        metadata_=body.metadata,
+        metadata_={**body.metadata, "transaction_id": body.transaction_id},
     )
     db.add(txn)
     await db.flush()  # get txn.id without committing

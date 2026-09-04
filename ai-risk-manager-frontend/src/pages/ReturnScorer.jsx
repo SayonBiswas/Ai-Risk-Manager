@@ -85,7 +85,9 @@ const ReturnScorer = () => {
         metadata: {},
       };
 
-      const response = await apiClient.post('/v1/returns/score', payload);
+      const response = await apiClient.post('/v1/fraud/detect', payload, {
+          headers: { 'X-API-Key': localStorage.getItem('rm_active_api_key') }
+        });
       setResult(response.data);
     } catch (error) {
       setApiError(error.response?.data?.message || error.message || 'Failed to score return risk');

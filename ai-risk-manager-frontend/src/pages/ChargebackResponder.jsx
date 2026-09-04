@@ -63,7 +63,9 @@ const ChargebackResponder = () => {
         dispute_deadline: formData.dispute_deadline,
       };
 
-      const response = await apiClient.post('/v1/chargebacks/respond', payload);
+        const response = await apiClient.post('/v1/chargebacks/respond', payload, {
+          headers: { 'X-API-Key': localStorage.getItem('rm_active_api_key') }
+        });
       setResult(response.data);
     } catch (error) {
       if (error.response?.status === 404) {
