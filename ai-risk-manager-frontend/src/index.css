@@ -41,3 +41,28 @@ body {
   color: #ffb4ab;
   border: 1px solid rgba(255, 180, 171, 0.3);
 }
+
+.rm-input {
+  width: 100%;
+  background: #0d0d15;
+  border: 1px solid #464554;
+  color: #e4e1ed;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.rm-input:focus {
+  border-color: #c0c1ff;
+  box-shadow: 0 0 0 1px #c0c1ff;
+}
+
+.rm-input::placeholder {
+  color: rgba(199, 196, 215, 0.4);
+}
+
+.rm-select {
+  appearance: none;
+}
