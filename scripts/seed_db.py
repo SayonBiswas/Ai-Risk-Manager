@@ -32,10 +32,12 @@ async def seed() -> None:
     merchant = Merchant(
         id=uuid.uuid4(),
         name="Test Merchant",
+        email="seed@example.com",
+        password_hash="seed_placeholder_not_for_login",
         api_key_hash=hash_api_key(raw_key),
         role=RoleEnum.MERCHANT,
         is_active=True,
-        webhook_url="https://webhook.site/your-test-id",  # replace with yours
+        webhook_url="https://webhook.site/your-test-id",
         webhook_secret=generate_api_key(),
     )
 

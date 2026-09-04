@@ -1,0 +1,50 @@
+{
+  "fraud": {
+    "model": "Fraud Detector",
+    "threshold": 0.5,
+    "precision": 0.0471,
+    "recall": 0.0606,
+    "f1": 0.053,
+    "roc_auc": 0.5623,
+    "false_positive_rate": 0.0419,
+    "false_positive_cost": 77097.84,
+    "confusion_matrix": {
+      "tn": 1853,
+      "fp": 81,
+      "fn": 62,
+      "tp": 4
+    }
+  },
+  "returns": {
+    "model": "Return Risk Scorer",
+    "threshold": 0.5,
+    "precision": 0.0966,
+    "recall": 0.6154,
+    "f1": 0.167,
+    "roc_auc": 0.5613,
+    "false_positive_rate": 0.487,
+    "false_positive_cost": 890596.7,
+    "confusion_matrix": {
+      "tn": 946,
+      "fp": 898,
+      "fn": 60,
+      "tp": 96
+    }
+  },
+  "chargebacks": {
+    "model": "Chargeback Risk Scorer",
+    "threshold": 0.5,
+    "precision": 0.1051,
+    "recall": 0.6838,
+    "f1": 0.1822,
+    "roc_auc": 0.7001,
+    "false_positive_rate": 0.3617,
+    "false_positive_cost": 710151.66,
+    "confusion_matrix": {
+      "tn": 1202,
+      "fp": 681,
+      "fn": 37,
+      "tp": 80
+    }
+  }
+}
