@@ -4,15 +4,15 @@ No auth required — used by load balancers, Render health checks, and uptime mo
 """
 
 from fastapi import APIRouter
-
 from app.core.config import get_settings
 
 router = APIRouter()
 settings = get_settings()
 
 
-@router.get(
+@router.api_route(
     "/health",
+    methods=["GET", "HEAD"],
     tags=["Health"],
     summary="Liveness probe",
     description="Returns service status and version. No authentication required.",
@@ -30,8 +30,10 @@ async def health_check() -> dict:
 )
 async def test_fraud_detection(transaction: dict) -> dict:
     """Test endpoint that mimics fraud detection without authentication."""
-    # Validate required fields
-    required_fields = ["transaction_id", "amount", "currency", "customer_id", "payment_method", "ip_address", "merchant_category_code"]
+    required_fields = [
+        "transaction_id", "amount", "currency", "customer_id",
+        "payment_method", "ip_address", "merchant_category_code"
+    ]
     for field in required_fields:
         if field not in transaction:
             return {
@@ -44,7 +46,7 @@ async def test_fraud_detection(transaction: dict) -> dict:
                 "reason": f"Invalid request: missing {field}",
                 "recommended_actions": ["Fix request format"],
                 "model_version": "test-mode",
-                "latency_ms": 0
+                "latency_ms": 0,
             }
 
     return {
@@ -56,5 +58,5 @@ async def test_fraud_detection(transaction: dict) -> dict:
         "reason": "Test transaction - all risk signals within acceptable thresholds.",
         "recommended_actions": ["Monitor transaction", "Process normally"],
         "model_version": "test-mode",
-        "latency_ms": 50
+        "latency_ms": 50,
     }
