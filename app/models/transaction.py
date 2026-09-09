@@ -3,7 +3,7 @@ Pydantic v2 request and response schemas for all API endpoints.
 """
 
 import ipaddress
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Literal
 
@@ -139,3 +139,64 @@ class ReturnRiskResponse(BaseModel):
     recommended_actions: list[str]
     model_version: str
     latency_ms: int
+
+
+# ── Transaction List Response Schemas ───────────────────────────────────────────
+
+class TransactionListItem(BaseModel):
+    model_config = ConfigDict(strict=False)
+
+    id: str
+    amount: Decimal
+    currency: str
+    customer_id: str
+    payment_method: str
+    created_at: datetime
+    decision: Literal["ALLOW", "FLAG", "BLOCK"]
+    fraud_score: float
+
+
+class TransactionListResponse(BaseModel):
+    model_config = ConfigDict(strict=False)
+
+    items: list[TransactionListItem]
+    total: int
+    page: int
+    pages: int
+
+
+class TransactionStatsResponse(BaseModel):
+    model_config = ConfigDict(strict=False)
+
+    today_count: int
+    blocked_count: int
+    flagged_count: int
+    avg_fraud_score: float
+    seven_day_breakdown: list[dict]
+
+
+class TransactionDetailResponse(BaseModel):
+    model_config = ConfigDict(strict=False)
+
+    # Transaction fields
+    id: str
+    merchant_id: str
+    amount: Decimal
+    currency: str
+    customer_id: str
+    payment_method: str
+    device_id: str | None
+    ip_address: str
+    merchant_category_code: str
+    is_international: bool
+    metadata: dict
+    created_at: datetime
+
+    # RiskDecision fields
+    decision: Literal["ALLOW", "FLAG", "BLOCK"]
+    fraud_score: float
+    return_risk_score: float
+    chargeback_risk_score: float
+    model_version: str
+    feature_snapshot: dict
+    llm_reason: str | None
