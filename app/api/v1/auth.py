@@ -1,9 +1,10 @@
 """
-Authentication endpoints — register, login, and get current user info.
+Authentication endpoints — register, login, password reset, and get current user info.
 """
 
+import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,9 +15,14 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_jwt, decode_jwt, generate_api_key, hash_api_key
+from app.core.config import get_settings
+from app.core.security import (
+    create_jwt, decode_jwt, generate_api_key, hash_api_key,
+    generate_reset_token
+)
 from app.db.session import get_db
-from app.db.models import Merchant, RoleEnum
+from app.db.models import Merchant, RoleEnum, PasswordResetToken
+from app.services.email_service import EmailService
 
 router = APIRouter()
 security = HTTPBearer()
@@ -70,6 +76,34 @@ class UserResponse(BaseModel):
     email: str
     role: str
     created_at: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request model for forgot password."""
+    email: EmailStr = Field(..., description="Email address associated with the account")
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Response model for forgot password."""
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request model for reset password."""
+    token: str = Field(..., description="Password reset token from email")
+    new_password: str = Field(..., min_length=8, max_length=100, description="New password (min 8 characters)")
+    
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    """Response model for reset password."""
+    message: str
 
 
 # ── Helper Functions ─────────────────────────────────────────────────────────────
@@ -260,4 +294,146 @@ async def get_me(
         email=current_merchant.email,
         role=current_merchant.role.value,
         created_at=current_merchant.created_at.isoformat()
+    )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="Request password reset email",
+    description=(
+        "Initiates the password reset process by sending an email with a reset link. "
+        "Returns 200 even if email doesn't exist to prevent email enumeration."
+    ),
+)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ForgotPasswordResponse:
+    """Request a password reset email."""
+    
+    # Find merchant by email
+    result = await db.execute(
+        select(Merchant).where(Merchant.email == request.email)
+    )
+    merchant = result.scalar_one_or_none()
+    
+    # Only proceed if merchant exists (but don't reveal this to the user)
+    if merchant:
+        # Generate reset token
+        raw_token, hashed_token = generate_reset_token()
+        
+        # Calculate expiry (1 hour from now)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        
+        # Store token in database
+        reset_token = PasswordResetToken(
+            merchant_id=merchant.id,
+            token_hash=hashed_token,
+            expires_at=expires_at,
+        )
+        db.add(reset_token)
+        await db.commit()
+        
+        # Send email with reset link
+        settings = get_settings()
+        reset_url = f"{settings.frontend_url}/reset-password?token={raw_token}"
+        
+        try:
+            await EmailService.send_reset_email(
+                to_email=merchant.email,
+                merchant_name=merchant.name,
+                reset_url=reset_url
+            )
+        except Exception as e:
+            # Log error but don't reveal to user
+            import traceback
+            print(f"Failed to send reset email: {e}")
+            print(f"Email details: to={merchant.email}, url={reset_url}")
+            print(f"Traceback: {traceback.format_exc()}")
+    
+    # Always return success to prevent email enumeration
+    return ForgotPasswordResponse(
+        message="If that email exists, a reset link has been sent."
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    summary="Reset password with token",
+    description=(
+        "Resets the user's password using a valid reset token from the email. "
+        "The token must be unused, not expired, and the merchant must be active."
+    ),
+)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ResetPasswordResponse:
+    """Reset password using a token."""
+    
+    # Hash the incoming token to match against stored hash
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    
+    # Find the reset token in database
+    result = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == token_hash
+        )
+    )
+    reset_token = result.scalar_one_or_none()
+    
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Check if token is already used
+    if reset_token.used_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset token has already been used"
+        )
+    
+    # Check if token is expired
+    if datetime.now(timezone.utc) > reset_token.expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
+    
+    # Get the merchant
+    merchant_result = await db.execute(
+        select(Merchant).where(Merchant.id == reset_token.merchant_id)
+    )
+    merchant = merchant_result.scalar_one_or_none()
+    
+    if not merchant:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token"
+        )
+    
+    # Check if merchant is active
+    if not merchant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Please contact support."
+        )
+    
+    # Hash the new password
+    hashed_password = pwd_context.hash(request.new_password)
+    
+    # Update merchant's password
+    merchant.password_hash = hashed_password
+    
+    # Mark token as used
+    reset_token.used_at = datetime.now(timezone.utc)
+    
+    await db.commit()
+    
+    return ResetPasswordResponse(
+        message="Password updated successfully."
     )

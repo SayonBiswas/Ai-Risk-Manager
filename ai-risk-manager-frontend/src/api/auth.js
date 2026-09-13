@@ -20,3 +20,9 @@ export const getApiKeys = (token) =>
   client.get('/api-keys', {
     headers: { Authorization: `Bearer ${token}` }
   });
+
+export const forgotPassword = (email) =>
+  client.post('/auth/forgot-password', { email });
+
+export const resetPassword = (token, new_password) =>
+  client.post('/auth/reset-password', { token, new_password });

@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(100, alias="RATE_LIMIT_REQUESTS")
     rate_limit_window_seconds: int = Field(60, alias="RATE_LIMIT_WINDOW_SECONDS")
 
+    # ── Email (Resend SMTP) ───────────────────────────────────────────────────
+    resend_api_key: str = Field("", alias="RESEND_API_KEY")
+    mail_from: str = Field("noreply@yourapp.com", alias="MAIL_FROM")
+    mail_from_name: str = Field("AI Risk Manager", alias="MAIL_FROM_NAME")
+    frontend_url: str = Field("http://localhost:5173", alias="FRONTEND_URL")
+
     # ── Computed ──────────────────────────────────────────────────────────────
     @computed_field
     @property

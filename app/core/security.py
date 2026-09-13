@@ -41,3 +41,28 @@ def decode_jwt(token: str) -> dict | None:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
     except JWTError:
         return None
+
+
+def generate_reset_token() -> tuple[str, str]:
+    """Generate a password reset token.
+    
+    Returns:
+        tuple: (raw_token, hashed_token) - raw token for email, hashed for DB storage
+    """
+    raw_token = secrets.token_urlsafe(32)
+    hashed_token = hashlib.sha256(raw_token.encode()).hexdigest()
+    return raw_token, hashed_token
+
+
+def verify_reset_token(raw_token: str, hashed: str) -> bool:
+    """Verify a password reset token against its hash.
+    
+    Args:
+        raw_token: The raw token from the email link
+        hashed: The hashed token stored in the database
+        
+    Returns:
+        bool: True if the token matches the hash
+    """
+    raw_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    return raw_hash == hashed

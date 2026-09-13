@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import ApiKeys from './pages/ApiKeys';
 import Dashboard from './pages/Dashboard';
 import FraudDetect from './pages/FraudDetect';
@@ -27,8 +29,10 @@ const AppContent = () => (
   <Routes>
     <Route path="/" element={<Navigate to="/login" replace />} />
 
-    <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-    <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+    <Route path="/login"           element={<PublicRoute><Login /></PublicRoute>} />
+    <Route path="/register"        element={<PublicRoute><Register /></PublicRoute>} />
+    <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+    <Route path="/reset-password"  element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
     <Route path="/api-keys" element={
       <PrivateRoute requireKey={false}><ApiKeys /></PrivateRoute>
