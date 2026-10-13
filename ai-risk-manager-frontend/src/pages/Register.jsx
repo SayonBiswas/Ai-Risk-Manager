@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShieldCheck, CheckCircle } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { register } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -25,18 +25,26 @@ const strengthConfig = {
   strong: { segments: 4, color: '#4edea3', label: 'Strong' },
 };
 
+const SECURITY_QUESTIONS = [
+  "What was the name of your first pet?",
+  "What city were you born in?",
+  "What is your mother's maiden name?",
+  "What was the name of your elementary school?",
+  "What is your favorite movie?",
+  "What year did you graduate high school?",
+];
+
 const Register = () => {
   const navigate = useNavigate();
-  const { setAuth, setActiveApiKey } = useAuth();
+  const { setAuth } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [initialApiKey, setInitialApiKey] = useState('');
-  const [copied, setCopied] = useState(false);
   const [showColdStart, setShowColdStart] = useState(false);
 
   useEffect(() => {
@@ -53,14 +61,19 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!securityQuestion || !securityAnswer) {
+      setError('Please select a security question and provide an answer.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await register(name, email, password);
-      const { access_token, merchant_id, name: rName, initial_api_key } = res.data;
+      const res = await register(name, email, password, securityQuestion, securityAnswer);
+      const { access_token, merchant_id, name: rName } = res.data;
       setAuth(access_token, { merchant_id, name: rName, email, role: 'MERCHANT' });
-      setActiveApiKey(initial_api_key);
-      setInitialApiKey(initial_api_key);
-      setShowModal(true);
+      // Navigate to API keys page to create a key
+      navigate('/api-keys');
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;
@@ -72,14 +85,6 @@ const Register = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCopyAndContinue = async () => {
-    try {
-      await navigator.clipboard.writeText(initialApiKey);
-      setCopied(true);
-    } catch (_) {}
-    setTimeout(() => navigate('/dashboard'), 500);
   };
 
   return (
@@ -160,6 +165,39 @@ const Register = () => {
             )}
           </div>
 
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+              Security Question
+            </label>
+            <select
+              className="rm-input"
+              value={securityQuestion}
+              onChange={(e) => setSecurityQuestion(e.target.value)}
+              required
+            >
+              <option value="">Select a question</option>
+              {SECURITY_QUESTIONS.map((q) => (
+                <option key={q} value={q}>
+                  {q}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+              Security Answer
+            </label>
+            <input
+              type="text"
+              className="rm-input"
+              placeholder="Your answer (case-insensitive)"
+              value={securityAnswer}
+              onChange={(e) => setSecurityAnswer(e.target.value)}
+              required
+            />
+          </div>
+
           {error && <p className="text-[#ffb4ab] text-sm">{error}</p>}
 
           <button
@@ -195,42 +233,6 @@ const Register = () => {
           </span>
         </div>
       )}
-
-      {/* API Key reveal modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/40">
-          <div className="glass-panel max-w-md w-full mx-4 rounded-xl p-8 text-center">
-            <CheckCircle
-              size={48}
-              className="text-[#4edea3] mx-auto"
-              style={{ animation: 'scaleIn 0.3s ease' }}
-            />
-            <h2 className="text-xl font-bold text-[#e4e1ed] mt-4">Account Created!</h2>
-            <p className="text-sm text-[#c7c4d7]/70 mt-2">
-              Your API key has been generated. This is the{' '}
-              <span className="text-[#ffb95f] font-semibold">ONLY time</span> it will be shown.
-            </p>
-
-            <div className="bg-[#0d0d15] border border-[#c0c1ff]/30 rounded p-3 mt-4 font-mono text-sm text-[#c0c1ff] break-all text-left">
-              {initialApiKey}
-            </div>
-
-            <button
-              onClick={handleCopyAndContinue}
-              className="w-full mt-4 bg-[#4edea3] text-[#0d1f18] font-semibold rounded py-2.5 text-sm hover:bg-[#6eeab5] active:scale-[0.98] transition-all"
-            >
-              {copied ? '✓ Copied!' : 'Copy Key & Continue'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes scaleIn {
-          from { transform: scale(0.5); opacity: 0; }
-          to   { transform: scale(1);   opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 };

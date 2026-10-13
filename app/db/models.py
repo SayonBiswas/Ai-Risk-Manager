@@ -58,6 +58,8 @@ class Merchant(Base):
         Enum(RoleEnum, name="role_enum"), nullable=False, default=RoleEnum.MERCHANT
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    security_question: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    security_answer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     webhook_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -68,6 +70,34 @@ class Merchant(Base):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="merchant", lazy="noload"
     )
+    api_keys: Mapped[list["ApiKey"]] = relationship(
+        back_populates="merchant", lazy="noload"
+    )
+
+
+# ── ApiKey ────────────────────────────────────────────────────────────────────
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    merchant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("merchants.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+
+    # relationships
+    merchant: Mapped["Merchant"] = relationship(back_populates="api_keys", lazy="noload")
 
 
 # ── Transaction ───────────────────────────────────────────────────────────────

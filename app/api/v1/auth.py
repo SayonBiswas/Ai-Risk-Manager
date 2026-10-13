@@ -36,7 +36,9 @@ class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Merchant name")
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=100, description="Password (min 8 characters)")
-    
+    security_question: str = Field(..., description="Security question for password recovery")
+    security_answer: str = Field(..., min_length=1, max_length=255, description="Answer to security question")
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
@@ -51,7 +53,6 @@ class RegisterResponse(BaseModel):
     token_type: str = "bearer"
     merchant_id: str
     name: str
-    initial_api_key: str
     message: str
 
 
@@ -83,9 +84,22 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="Email address associated with the account")
 
 
+class ForgotPasswordVerifyRequest(BaseModel):
+    """Request model for verifying security question."""
+    email: EmailStr = Field(..., description="Email address associated with the account")
+    security_answer: str = Field(..., description="Answer to security question")
+
+
 class ForgotPasswordResponse(BaseModel):
     """Response model for forgot password."""
     message: str
+    security_question: str | None = None
+
+
+class ForgotPasswordVerifyResponse(BaseModel):
+    """Response model for verifying security question."""
+    verified: bool
+    reset_token: str | None = None
 
 
 class ResetPasswordRequest(BaseModel):
@@ -103,6 +117,24 @@ class ResetPasswordRequest(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     """Response model for reset password."""
+    message: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request model for changing password."""
+    current_password: str = Field(..., description="Current password for verification")
+    new_password: str = Field(..., min_length=8, max_length=100, description="New password (min 8 characters)")
+    
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class ChangePasswordResponse(BaseModel):
+    """Response model for changing password."""
     message: str
 
 
@@ -167,53 +199,50 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
     """Register a new merchant account."""
-    
+
     # Check if email already exists
     result = await db.execute(
         select(Merchant).where(Merchant.email == request.email)
     )
     existing_merchant = result.scalar_one_or_none()
-    
+
     if existing_merchant:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
+
     # Hash password
     hashed_password = pwd_context.hash(request.password)
-    
-    # Generate initial API key
-    raw_api_key = generate_api_key()
-    api_key_hash = hash_api_key(raw_api_key)
-    
-    # Create merchant
+
+    # Create merchant (no initial API key - users create them via the API keys endpoint)
     merchant = Merchant(
         name=request.name,
         email=request.email,
         password_hash=hashed_password,
-        api_key_hash=api_key_hash,
+        api_key_hash="",  # Empty since we're using the new api_keys table
         role=RoleEnum.MERCHANT,
         is_active=True,
+        security_question=request.security_question,
+        security_answer=request.security_answer.lower().strip(),
     )
-    
+
     db.add(merchant)
     await db.commit()
     await db.refresh(merchant)
-    
+
     # Create JWT token
     access_token = create_jwt({
         "merchant_id": str(merchant.id),
         "role": "MERCHANT"
     })
-    
+
     return RegisterResponse(
         access_token=access_token,
         token_type="bearer",
         merchant_id=str(merchant.id),
         name=merchant.name,
-        initial_api_key=raw_api_key,
-        message="Account created. Save your API key — it will not be shown again."
+        message="Account created. Please create an API key in the dashboard to start using the API."
     )
 
 
@@ -300,62 +329,81 @@ async def get_me(
 @router.post(
     "/forgot-password",
     response_model=ForgotPasswordResponse,
-    summary="Request password reset email",
+    summary="Request password reset - get security question",
     description=(
-        "Initiates the password reset process by sending an email with a reset link. "
-        "Returns 200 even if email doesn't exist to prevent email enumeration."
+        "Initiates the password reset process by returning the security question "
+        "for the given email. Returns 200 even if email doesn't exist to prevent email enumeration."
     ),
 )
 async def forgot_password(
     request: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ForgotPasswordResponse:
-    """Request a password reset email."""
-    
+    """Request password reset - get security question."""
+
     # Find merchant by email
     result = await db.execute(
         select(Merchant).where(Merchant.email == request.email)
     )
     merchant = result.scalar_one_or_none()
-    
-    # Only proceed if merchant exists (but don't reveal this to the user)
-    if merchant:
-        # Generate reset token
-        raw_token, hashed_token = generate_reset_token()
-        
-        # Calculate expiry (1 hour from now)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        
-        # Store token in database
-        reset_token = PasswordResetToken(
-            merchant_id=merchant.id,
-            token_hash=hashed_token,
-            expires_at=expires_at,
+
+    # Return security question if merchant exists
+    if merchant and merchant.security_question:
+        return ForgotPasswordResponse(
+            message="Account found. Please answer your security question.",
+            security_question=merchant.security_question
         )
-        db.add(reset_token)
-        await db.commit()
-        
-        # Send email with reset link
-        settings = get_settings()
-        reset_url = f"{settings.frontend_url}/reset-password?token={raw_token}"
-        
-        try:
-            await EmailService.send_reset_email(
-                to_email=merchant.email,
-                merchant_name=merchant.name,
-                reset_url=reset_url
-            )
-        except Exception as e:
-            # Log error but don't reveal to user
-            import traceback
-            print(f"Failed to send reset email: {e}")
-            print(f"Email details: to={merchant.email}, url={reset_url}")
-            print(f"Traceback: {traceback.format_exc()}")
-    
-    # Always return success to prevent email enumeration
+
+    # Return generic message if no merchant or no security question
     return ForgotPasswordResponse(
-        message="If that email exists, a reset link has been sent."
+        message="If that email exists, you can proceed to verify your identity."
     )
+
+
+@router.post(
+    "/forgot-password/verify",
+    response_model=ForgotPasswordVerifyResponse,
+    summary="Verify security answer and get reset token",
+    description=(
+        "Verifies the security answer and returns a reset token if correct. "
+        "The token can be used to reset the password."
+    ),
+)
+async def forgot_password_verify(
+    request: ForgotPasswordVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ForgotPasswordVerifyResponse:
+    """Verify security answer and return reset token."""
+
+    # Find merchant by email
+    result = await db.execute(
+        select(Merchant).where(Merchant.email == request.email)
+    )
+    merchant = result.scalar_one_or_none()
+
+    if not merchant or not merchant.security_answer:
+        return ForgotPasswordVerifyResponse(verified=False, reset_token=None)
+
+    # Check if security answer matches (case-insensitive)
+    if merchant.security_answer.lower().strip() != request.security_answer.lower().strip():
+        return ForgotPasswordVerifyResponse(verified=False, reset_token=None)
+
+    # Generate reset token
+    raw_token, hashed_token = generate_reset_token()
+
+    # Calculate expiry (1 hour from now)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    # Store token in database
+    reset_token = PasswordResetToken(
+        merchant_id=merchant.id,
+        token_hash=hashed_token,
+        expires_at=expires_at,
+    )
+    db.add(reset_token)
+    await db.commit()
+
+    return ForgotPasswordVerifyResponse(verified=True, reset_token=raw_token)
 
 
 @router.post(
@@ -436,4 +484,47 @@ async def reset_password(
     
     return ResetPasswordResponse(
         message="Password updated successfully."
+    )
+
+
+@router.post(
+    "/change-password",
+    response_model=ChangePasswordResponse,
+    summary="Change password for authenticated user",
+    description=(
+        "Allows an authenticated user to change their password by providing "
+        "their current password for verification. Requires a valid JWT bearer token."
+    ),
+)
+async def change_password(
+    request: ChangePasswordRequest,
+    current_merchant: Merchant = Depends(get_current_merchant),
+    db: AsyncSession = Depends(get_db),
+) -> ChangePasswordResponse:
+    """Change password for authenticated user."""
+    
+    # Verify current password
+    if not pwd_context.verify(request.current_password, current_merchant.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Check if new password is same as current
+    if pwd_context.verify(request.new_password, current_merchant.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+    
+    # Hash the new password
+    hashed_password = pwd_context.hash(request.new_password)
+    
+    # Update merchant's password
+    current_merchant.password_hash = hashed_password
+    
+    await db.commit()
+    
+    return ChangePasswordResponse(
+        message="Password changed successfully."
     )

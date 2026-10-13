@@ -1,24 +1,51 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck, CheckCircle, ArrowLeft } from 'lucide-react';
-import { forgotPassword } from '../api/auth';
+import { forgotPassword, forgotPasswordVerify } from '../api/auth';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [step, setStep] = useState(1); // 1: enter email, 2: answer question
 
-  const handleSubmit = async (e) => {
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await forgotPassword(email);
-      setSuccess(true);
+      const res = await forgotPassword(email);
+      if (res.data.security_question) {
+        setSecurityQuestion(res.data.security_question);
+        setStep(2);
+      } else {
+        setError('No security question found for this account. Please contact support.');
+      }
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnswerSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await forgotPasswordVerify(email, securityAnswer);
+      if (res.data.verified && res.data.reset_token) {
+        // Redirect to reset password page with the token
+        navigate(`/reset-password?token=${res.data.reset_token}`);
+      } else {
+        setError('Incorrect answer. Please try again.');
+      }
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setError(detail || 'Something went wrong. Please try again.');
@@ -38,29 +65,13 @@ const ForgotPassword = () => {
           <ShieldCheck size={36} className="text-[#c0c1ff] mx-auto" />
           <h1 className="text-2xl font-bold text-[#e4e1ed] mt-3">Reset Password</h1>
           <p className="text-sm text-[#c7c4d7]/60 mt-1">
-            Enter your email and we'll send you a reset link.
+            {step === 1 ? 'Enter your email to get started.' : 'Answer your security question.'}
           </p>
         </div>
 
-        {/* Success State */}
-        {success ? (
-          <div className="text-center py-8">
-            <CheckCircle size={48} className="text-[#4edea3] mx-auto" />
-            <h2 className="text-lg font-semibold text-[#e4e1ed] mt-4">Check your inbox</h2>
-            <p className="text-sm text-[#c7c4d7]/70 mt-2">
-              A reset link has been sent to your email address.
-            </p>
-            <button
-              onClick={() => navigate('/login')}
-              className="mt-6 text-[#c0c1ff] hover:underline text-sm flex items-center gap-1 mx-auto"
-            >
-              <ArrowLeft size={16} />
-              Back to Login
-            </button>
-          </div>
-        ) : (
-          /* Form */
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Step 1: Enter Email */}
+        {step === 1 ? (
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
                 Email Address
@@ -85,10 +96,10 @@ const ForgotPassword = () => {
               {loading ? (
                 <>
                   <LoadingSpinner size="sm" />
-                  Sending...
+                  Loading...
                 </>
               ) : (
-                'Send Reset Link'
+                'Continue'
               )}
             </button>
 
@@ -100,6 +111,64 @@ const ForgotPassword = () => {
                 <ArrowLeft size={14} />
                 Back to Login
               </Link>
+            </div>
+          </form>
+        ) : (
+          /* Step 2: Answer Security Question */
+          <form onSubmit={handleAnswerSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                Security Question
+              </label>
+              <div className="bg-[#1f1f27] rounded p-3 text-sm text-[#e4e1ed]">
+                {securityQuestion}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                Your Answer
+              </label>
+              <input
+                type="text"
+                className="rm-input"
+                placeholder="Enter your answer"
+                value={securityAnswer}
+                onChange={(e) => setSecurityAnswer(e.target.value)}
+                required
+              />
+            </div>
+
+            {error && <p className="text-[#ffb4ab] text-sm">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-6 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded py-2.5 text-sm hover:bg-[#d0d1ff] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify & Continue'
+              )}
+            </button>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setError('');
+                  setSecurityAnswer('');
+                }}
+                className="text-xs text-[#c7c4d7]/60 hover:text-[#c0c1ff] flex items-center gap-1 justify-center"
+              >
+                <ArrowLeft size={14} />
+                Back
+              </button>
             </div>
           </form>
         )}

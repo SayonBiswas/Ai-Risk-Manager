@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Lock, X } from 'lucide-react';
 import { login } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -14,6 +14,12 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showColdStart, setShowColdStart] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowColdStart(true), 3000);
@@ -38,6 +44,45 @@ const Login = () => {
       setError(status === 401 ? 'Invalid email or password.' : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setChangePasswordError('');
+
+    // Client-side validation
+    if (newPassword.length < 8) {
+      setChangePasswordError('New password must be at least 8 characters long');
+      return;
+    }
+    if (newPassword === password) {
+      setChangePasswordError('New password must be different from current password');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('Passwords do not match');
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      const { changePassword } = await import('../api/auth');
+      const res = await login(email, password);
+      const { access_token } = res.data;
+      await changePassword(access_token, password, newPassword);
+      setChangePasswordSuccess(true);
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setChangePasswordSuccess(false);
+        setNewPassword('');
+        setConfirmPassword('');
+      }, 2000);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setChangePasswordError(detail || 'Failed to change password. Please check your credentials.');
+    } finally {
+      setChangePasswordLoading(false);
     }
   };
 
@@ -84,7 +129,14 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <div className="text-right mt-1">
+            <div className="flex justify-between items-center mt-1">
+              <button
+                type="button"
+                onClick={() => setShowChangePassword(true)}
+                className="text-xs text-[#c7c4d7]/60 hover:text-[#c0c1ff]"
+              >
+                Change password
+              </button>
               <Link
                 to="/forgot-password"
                 className="text-xs text-[#c7c4d7]/60 hover:text-[#c0c1ff]"
@@ -121,6 +173,91 @@ const Login = () => {
           </p>
         </form>
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-panel w-full max-w-[400px] rounded-xl p-8 relative">
+            <button
+              onClick={() => {
+                setShowChangePassword(false);
+                setChangePasswordError('');
+                setChangePasswordSuccess(false);
+                setNewPassword('');
+                setConfirmPassword('');
+              }}
+              className="absolute top-4 right-4 text-[#c7c4d7]/60 hover:text-[#e4e1ed]"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <Lock size={36} className="text-[#c0c1ff] mx-auto" />
+              <h2 className="text-xl font-bold text-[#e4e1ed] mt-3">Change Password</h2>
+              <p className="text-sm text-[#c7c4d7]/60 mt-1">
+                Enter your current credentials and new password
+              </p>
+            </div>
+
+            {changePasswordSuccess ? (
+              <div className="text-center py-8">
+                <p className="text-[#4edea3] font-semibold">Password changed successfully!</p>
+              </div>
+            ) : (
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    className="rm-input"
+                    placeholder="Minimum 8 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    className="rm-input"
+                    placeholder="Confirm your new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+
+                {changePasswordError && (
+                  <p className="text-[#ffb4ab] text-sm">{changePasswordError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={changePasswordLoading}
+                  className="w-full mt-6 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded py-2.5 text-sm hover:bg-[#d0d1ff] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {changePasswordLoading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Changing...
+                    </>
+                  ) : (
+                    'Change Password'
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cold start notice */}
       {showColdStart && (

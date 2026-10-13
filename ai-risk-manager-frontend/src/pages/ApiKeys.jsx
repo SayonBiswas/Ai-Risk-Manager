@@ -1,224 +1,426 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Key, CheckCircle, Info, AlertTriangle } from 'lucide-react';
-import { generateApiKey } from '../api/auth';
+import { Plus, Pencil, Trash2, Copy, X, Check } from 'lucide-react';
+import { getApiKeys, createApiKey, deleteApiKey, updateApiKey } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import StatusChip from '../components/StatusChip';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return 'Never';
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return date.toLocaleDateString();
+};
+
+const getStatus = (key) => {
+  if (!key.is_active) return { label: 'REVOKED', color: '#9ca3af' };
+  if (key.expires_at && new Date(key.expires_at) < new Date()) {
+    return { label: 'EXPIRED', color: '#ffb4ab' };
+  }
+  return { label: 'ACTIVE', color: '#4edea3' };
+};
 
 const ApiKeys = () => {
   const navigate = useNavigate();
-  const { jwt, activeApiKey, setActiveApiKey } = useAuth();
+  const { jwt } = useAuth();
 
-  const [step, setStep] = useState('idle'); // idle | confirm | loading | revealed
-  const [newKey, setNewKey] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [keys, setKeys] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Create modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyExpiry, setNewKeyExpiry] = useState('never');
+  const [creating, setCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [showKeyReveal, setShowKeyReveal] = useState(false);
 
-  const isRegenerating = !!activeApiKey;
+  // Rename state
+  const [editingKeyId, setEditingKeyId] = useState(null);
+  const [editingKeyName, setEditingKeyName] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleGenerateClick = () => {
-    setStep('confirm');
-    setError('');
+  // Revoke state
+  const [revokingKeyId, setRevokingKeyId] = useState(null);
+
+  const cancelRename = () => {
+    setEditingKeyId(null);
+    setEditingKeyName('');
   };
 
-  const handleCancel = () => {
-    setStep('idle');
-    setError('');
-  };
+  useEffect(() => {
+    loadKeys();
+  }, []);
 
-  const handleConfirm = async () => {
-    setStep('loading');
+  // Handle Escape key to cancel rename
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && editingKeyId) {
+        cancelRename();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [editingKeyId]);
+
+  const loadKeys = async () => {
+    setLoading(true);
     setError('');
     try {
-      const res = await generateApiKey(jwt);
-      const key = res.data.api_key;
-      setNewKey(key);
-      setActiveApiKey(key);
-      setStep('revealed');
+      const res = await getApiKeys(jwt);
+      setKeys(res.data);
     } catch (err) {
-      setError('Failed to generate key. Please try again.');
-      setStep('idle');
+      setError('Failed to load API keys. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCopy = async () => {
+  const handleCreateKey = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setError('');
     try {
-      await navigator.clipboard.writeText(newKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const expiryDays = newKeyExpiry === 'never' ? null : parseInt(newKeyExpiry);
+      const res = await createApiKey(jwt, newKeyName, expiryDays);
+      setCreatedKey(res.data);
+      setShowKeyReveal(true);
+      setNewKeyName('');
+      setNewKeyExpiry('never');
+      loadKeys();
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || 'Failed to create API key. Please try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCopyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(createdKey.key);
+      setKeyCopied(true);
+      setTimeout(() => setKeyCopied(false), 2000);
     } catch (_) {}
   };
 
+  const handleConfirmKeySaved = () => {
+    setShowCreateModal(false);
+    setShowKeyReveal(false);
+    setCreatedKey(null);
+    setKeyCopied(false);
+  };
+
+  const startRename = (key) => {
+    setEditingKeyId(key.id);
+    setEditingKeyName(key.name);
+  };
+
+  const saveRename = async (e) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await updateApiKey(jwt, editingKeyId, editingKeyName);
+      setEditingKeyId(null);
+      setEditingKeyName('');
+      loadKeys();
+    } catch (err) {
+      setError('Failed to update API key name.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevokeKey = async (keyId) => {
+    try {
+      await deleteApiKey(jwt, keyId);
+      // Fade out the row
+      setKeys(prev => prev.filter(k => k.id !== keyId));
+      setRevokingKeyId(null);
+    } catch (err) {
+      setError('Failed to revoke API key.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout title="API Keys">
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="md" />
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="API Keys">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* Section 1 — Context banner */}
-        <div className="glass-panel rounded-xl p-6">
-          <div className="flex items-start gap-3">
-            <Key size={20} className="text-[#c0c1ff] mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-[#e4e1ed] font-semibold text-base">API Key Required</p>
-              <p className="text-sm text-[#c7c4d7]/70 mt-1">
-                Risk scoring endpoints (Fraud Detect, Return Risk, Chargebacks) require an API key
-                sent as the <span className="font-mono text-[#c0c1ff]">X-API-Key</span> header.
-                Generate one below to unlock the risk dashboard.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2 — Current key status */}
-        <div className="data-card rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 font-bold">
-              Active Key
-            </span>
-            <StatusChip status={activeApiKey ? 'ALLOW' : 'BLOCK'} />
-          </div>
-
-          {activeApiKey ? (
-            <>
-              <div className="bg-[#0d0d15] rounded p-3 font-mono text-sm text-[#c7c4d7] break-all">
-                {activeApiKey.slice(0, 12)}••••••••••••••••••••
-              </div>
-              <p className="text-xs text-[#c7c4d7]/40 mt-2">
-                Key is stored locally in your browser
-              </p>
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="bg-[#4edea3] text-[#0d1f18] font-semibold rounded px-4 py-2 text-sm hover:bg-[#6eeab5] active:scale-[0.98] transition-all"
-                >
-                  Use This Key
-                </button>
-                <button
-                  onClick={handleGenerateClick}
-                  className="border border-[#ffb95f]/40 text-[#ffb95f] text-sm rounded px-4 py-2 hover:bg-[#ffb95f]/10 transition-colors"
-                >
-                  Regenerate Key
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-[#c7c4d7]/60">No API key configured.</p>
-              <button
-                onClick={handleGenerateClick}
-                className="mt-3 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-5 py-2.5 text-sm hover:bg-[#d0d1ff] active:scale-[0.98] transition-all"
-              >
-                Generate Key
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Section 3 — Generate flow */}
-        {step === 'confirm' && (
-          <div
-            className={`glass-panel rounded-xl p-6 border ${
-              isRegenerating ? 'border-[#ffb95f]/20' : 'border-[#c0c1ff]/20'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle
-                size={20}
-                className={isRegenerating ? 'text-[#ffb95f] mt-0.5' : 'text-[#c0c1ff] mt-0.5'}
-              />
-              <div className="flex-1">
-                <p className="text-[#e4e1ed] font-semibold text-sm">
-                  {isRegenerating ? 'Regenerate API Key?' : 'Generate API Key?'}
-                </p>
-                {isRegenerating && (
-                  <p className="text-xs text-[#ffb95f] mt-1">
-                    This will invalidate your current key immediately.
-                  </p>
-                )}
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={handleConfirm}
-                    className="bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] transition-all"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    onClick={handleCancel}
-                    className="border border-white/10 text-[#c7c4d7]/60 text-sm rounded px-4 py-2 hover:bg-white/5 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 'loading' && (
-          <div className="glass-panel rounded-xl p-10 flex flex-col items-center gap-3">
-            <LoadingSpinner size="md" />
-            <p className="text-sm text-[#c7c4d7]/60">Generating secure key...</p>
-          </div>
-        )}
-
-        {step === 'revealed' && (
-          <div className="bg-[#0d1f18] border border-[#4edea3]/30 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-1">
-              <CheckCircle size={20} className="text-[#4edea3]" />
-              <span className="text-[#4edea3] font-semibold text-base">New API Key Generated</span>
-            </div>
-            <p className="text-xs text-[#ffb95f] mb-4">
-              Copy this key now. It will not be shown again after you leave this page.
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-[#e4e1ed]">API Keys</h2>
+            <p className="text-sm text-[#c7c4d7]/60 mt-1">
+              Manage your API keys for accessing risk scoring endpoints
             </p>
-            <div className="bg-[#0d0d15] rounded p-4 font-mono text-sm text-[#c0c1ff] break-all">
-              {newKey}
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={handleCopy}
-                className="bg-[#4edea3] text-[#0d1f18] font-semibold rounded px-4 py-2 text-sm hover:bg-[#6eeab5] transition-all"
-              >
-                {copied ? '✓ Copied!' : 'Copy Key'}
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="bg-[#c0c1ff]/10 text-[#c0c1ff] border border-[#c0c1ff]/20 rounded px-4 py-2 text-sm hover:bg-[#c0c1ff]/20 transition-colors"
-              >
-                Go to Dashboard
-              </button>
-            </div>
           </div>
-        )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] active:scale-[0.98] transition-all flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Create New Key
+          </button>
+        </div>
 
         {error && (
-          <p className="text-[#ffb4ab] text-sm">{error}</p>
+          <div className="bg-[#ffb4ab]/10 border border-[#ffb4ab]/30 rounded-lg px-4 py-3">
+            <p className="text-sm text-[#ffb4ab]">{error}</p>
+          </div>
         )}
 
-        {/* Section 4 — How it works */}
-        <div className="glass-panel rounded-xl p-6">
-          <p className="text-[#e4e1ed] font-semibold text-sm mb-4">How API Keys Work</p>
-          <ol className="space-y-3">
-            {[
-              'Generate a key above — it\'s cryptographically secure (riskmgr_ prefix + 32 random chars)',
-              'The key is hashed and stored on the server — we never store the raw key',
-              'Include it as the X-API-Key header on every risk scoring request',
-            ].map((text, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-[#c7c4d7]/70">
-                <span className="w-5 h-5 rounded-full bg-[#c0c1ff]/10 border border-[#c0c1ff]/20 text-[#c0c1ff] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                  {i + 1}
-                </span>
-                {text}
-              </li>
-            ))}
-          </ol>
-          <div className="bg-[#0d0d15] rounded p-3 font-mono text-xs text-[#c7c4d7] mt-4 whitespace-pre overflow-x-auto">
-{`curl -X POST https://api.example.com/v1/fraud/detect \\
-  -H "X-API-Key: riskmgr_your_key_here" \\
-  -H "Content-Type: application/json" \\
-  -d '{"transaction_id": "TXN-001", ...}'`}
+        {/* Keys table */}
+        {keys.length === 0 ? (
+          <div className="glass-panel rounded-xl p-12 text-center">
+            <p className="text-[#e4e1ed] font-semibold mb-2">No API keys yet</p>
+            <p className="text-sm text-[#c7c4d7]/60 mb-4">
+              Create your first API key to start using the risk scoring API
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] transition-all"
+            >
+              Create Your First Key
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="glass-panel rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5">
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Name</th>
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Prefix</th>
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Status</th>
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Created</th>
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Last Used</th>
+                  <th className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Expires</th>
+                  <th className="text-right text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 px-5 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((key) => {
+                  const status = getStatus(key);
+                  return (
+                    <tr
+                      key={key.id}
+                      className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <td className="py-4 px-5">
+                        {editingKeyId === key.id ? (
+                          <form onSubmit={saveRename} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              className="bg-[#0d0d15] border border-[#c0c1ff]/30 rounded px-2 py-1 text-sm text-[#e4e1ed] focus:outline-none focus:border-[#c0c1ff]"
+                              value={editingKeyName}
+                              onChange={(e) => setEditingKeyName(e.target.value)}
+                              maxLength={100}
+                              autoFocus
+                              disabled={saving}
+                            />
+                            <button
+                              type="submit"
+                              disabled={saving}
+                              className="text-[#4edea3] hover:text-[#6eeab5] transition-colors"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelRename}
+                              className="text-[#ffb4ab] hover:text-[#ff6b6b] transition-colors"
+                            >
+                              <X size={16} />
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="text-[#e4e1ed] font-medium">{key.name}</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-5">
+                        <code className="text-xs text-[#c7c4d7] bg-[#0d0d15] px-2 py-1 rounded">
+                          {key.key_prefix}...
+                        </code>
+                      </td>
+                      <td className="py-4 px-5">
+                        <span
+                          className="text-xs font-semibold px-2 py-1 rounded"
+                          style={{ backgroundColor: `${status.color}20`, color: status.color }}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="py-4 px-5 text-sm text-[#c7c4d7]/70">
+                        {new Date(key.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-4 px-5 text-sm text-[#c7c4d7]/70">
+                        {formatRelativeTime(key.last_used_at)}
+                      </td>
+                      <td className="py-4 px-5 text-sm text-[#c7c4d7]/70">
+                        {key.expires_at ? new Date(key.expires_at).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {key.is_active && (
+                            <>
+                              <button
+                                onClick={() => startRename(key)}
+                                className="p-1.5 text-[#c7c4d7]/60 hover:text-[#c0c1ff] hover:bg-white/5 rounded transition-colors"
+                                title="Rename"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setRevokingKeyId(key.id)}
+                                  className="p-1.5 text-[#c7c4d7]/60 hover:text-[#ffb4ab] hover:bg-white/5 rounded transition-colors"
+                                  title="Revoke"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                                {revokingKeyId === key.id && (
+                                  <div className="absolute right-0 top-full mt-2 w-48 bg-[#1f1f27] border border-white/10 rounded-lg p-3 shadow-xl z-10">
+                                    <p className="text-xs text-[#e4e1ed] mb-3">
+                                      Revoke "{key.name}"? This cannot be undone.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => setRevokingKeyId(null)}
+                                        className="flex-1 text-xs text-[#c7c4d7]/60 hover:text-[#e4e1ed] px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        onClick={() => handleRevokeKey(key.id)}
+                                        className="flex-1 text-xs text-[#ffb4ab] bg-[#ffb4ab]/10 px-2 py-1 rounded hover:bg-[#ffb4ab]/20 transition-colors"
+                                      >
+                                        Revoke
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Create Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-panel w-full max-w-md rounded-xl p-6 relative">
+              {!showKeyReveal ? (
+                <>
+                  <h3 className="text-lg font-bold text-[#e4e1ed] mb-4">Create New API Key</h3>
+                  <form onSubmit={handleCreateKey} className="space-y-4">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                        Key Name
+                      </label>
+                      <input
+                        type="text"
+                        className="rm-input"
+                        placeholder="e.g., Production Key"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        required
+                        maxLength={100}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                        Expiry
+                      </label>
+                      <select
+                        className="rm-input"
+                        value={newKeyExpiry}
+                        onChange={(e) => setNewKeyExpiry(e.target.value)}
+                      >
+                        <option value="30">30 days</option>
+                        <option value="90">90 days</option>
+                        <option value="365">1 year</option>
+                        <option value="never">Never</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateModal(false);
+                          setNewKeyName('');
+                          setNewKeyExpiry('never');
+                        }}
+                        className="flex-1 border border-white/10 text-[#c7c4d7]/60 text-sm rounded px-4 py-2 hover:bg-white/5 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={creating}
+                        className="flex-1 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {creating ? <LoadingSpinner size="sm" /> : 'Create'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-bold text-[#e4e1ed]">Save your API key</h3>
+                    <p className="text-sm text-[#ffb95f] mt-1">You won't see it again</p>
+                  </div>
+                  <div className="bg-[#0d0d15] border border-[#c0c1ff]/30 rounded p-4 mb-4">
+                    <code className="text-sm text-[#c0c1ff] break-all block">
+                      {createdKey.key}
+                    </code>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleCopyKey}
+                      className="flex-1 border border-[#c0c1ff]/30 text-[#c0c1ff] text-sm rounded px-4 py-2 hover:bg-[#c0c1ff]/10 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Copy size={14} />
+                      {keyCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={handleConfirmKeySaved}
+                      className="flex-1 bg-[#4edea3] text-[#0d1f18] font-semibold rounded px-4 py-2 text-sm hover:bg-[#6eeab5] transition-colors"
+                    >
+                      I've saved it
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
     </Layout>
