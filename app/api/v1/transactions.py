@@ -44,6 +44,7 @@ async def list_transactions(
     ),
     from_date: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    search: Optional[str] = Query(None, description="Search by transaction ID (partial match)"),
     current: dict = Depends(authenticated),
     db: AsyncSession = Depends(get_db),
 ) -> TransactionListResponse:
@@ -66,6 +67,8 @@ async def list_transactions(
     if to_date:
         to_datetime = datetime.combine(to_date, datetime.max.time()).replace(tzinfo=timezone.utc)
         conditions.append(Transaction.created_at <= to_datetime)
+    if search:
+        conditions.append(Transaction.id.ilike(f"%{search}%"))
 
     if conditions:
         query = query.where(and_(*conditions))

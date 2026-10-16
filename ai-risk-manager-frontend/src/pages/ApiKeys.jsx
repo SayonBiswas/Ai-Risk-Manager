@@ -29,12 +29,12 @@ const getStatus = (key) => {
 
 const ApiKeys = () => {
   const navigate = useNavigate();
-  const { jwt } = useAuth();
+  const { jwt, activeApiKey, setActiveApiKey } = useAuth();
 
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
@@ -51,6 +51,7 @@ const ApiKeys = () => {
 
   // Revoke state
   const [revokingKeyId, setRevokingKeyId] = useState(null);
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
 
   const cancelRename = () => {
     setEditingKeyId(null);
@@ -97,6 +98,8 @@ const ApiKeys = () => {
       setNewKeyName('');
       setNewKeyExpiry('never');
       loadKeys();
+      // Auto-activate the new key
+      setActiveApiKey(res.data.key);
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setError(detail || 'Failed to create API key. Please try again.');
@@ -118,11 +121,23 @@ const ApiKeys = () => {
     setShowKeyReveal(false);
     setCreatedKey(null);
     setKeyCopied(false);
+    setNewKeyName('');
+    setNewKeyExpiry('never');
   };
 
   const startRename = (key) => {
     setEditingKeyId(key.id);
     setEditingKeyName(key.name);
+  };
+
+  const startRevoke = (key) => {
+    setRevokingKeyId(key.id);
+    setShowRevokeModal(true);
+  };
+
+  const cancelRevoke = () => {
+    setRevokingKeyId(null);
+    setShowRevokeModal(false);
   };
 
   const saveRename = async (e) => {
@@ -144,9 +159,15 @@ const ApiKeys = () => {
   const handleRevokeKey = async (keyId) => {
     try {
       await deleteApiKey(jwt, keyId);
+      // Check if the revoked key was the active one
+      const revokedKey = keys.find(k => k.id === keyId);
+      if (revokedKey && activeApiKey && revokedKey.key_prefix === activeApiKey.slice(0, 16)) {
+        setActiveApiKey(null);
+      }
       // Fade out the row
       setKeys(prev => prev.filter(k => k.id !== keyId));
       setRevokingKeyId(null);
+      setShowRevokeModal(false);
     } catch (err) {
       setError('Failed to revoke API key.');
     }
@@ -182,6 +203,34 @@ const ApiKeys = () => {
             Create New Key
           </button>
         </div>
+
+        {/* Active Key Status */}
+        {keys.length > 0 && (
+          <div className="glass-panel rounded-xl p-4">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-2">
+              Active API Key
+            </label>
+            {activeApiKey ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[#4edea3] font-medium">
+                  ✓ {keys.find(k => k.key_prefix === activeApiKey.slice(0, 16))?.name || 'Unknown'}
+                </span>
+                <span className="text-xs text-[#c7c4d7]/50">
+                  ({activeApiKey.slice(0, 16)}...)
+                </span>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-[#ffb95f]">
+                  ⚠️ No API key currently active
+                </p>
+                <p className="text-xs text-[#c7c4d7]/60 mt-1">
+                  Create a new key to use the fraud detection and scoring features.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="bg-[#ffb4ab]/10 border border-[#ffb4ab]/30 rounded-lg px-4 py-3">
@@ -253,7 +302,14 @@ const ApiKeys = () => {
                             </button>
                           </form>
                         ) : (
-                          <span className="text-[#e4e1ed] font-medium">{key.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#e4e1ed] font-medium">{key.name}</span>
+                            {activeApiKey && key.key_prefix === activeApiKey.slice(0, 16) && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-[#4edea3]/20 text-[#4edea3] font-semibold">
+                                Active
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="py-4 px-5">
@@ -289,36 +345,13 @@ const ApiKeys = () => {
                               >
                                 <Pencil size={14} />
                               </button>
-                              <div className="relative">
-                                <button
-                                  onClick={() => setRevokingKeyId(key.id)}
-                                  className="p-1.5 text-[#c7c4d7]/60 hover:text-[#ffb4ab] hover:bg-white/5 rounded transition-colors"
-                                  title="Revoke"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                                {revokingKeyId === key.id && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 bg-[#1f1f27] border border-white/10 rounded-lg p-3 shadow-xl z-10">
-                                    <p className="text-xs text-[#e4e1ed] mb-3">
-                                      Revoke "{key.name}"? This cannot be undone.
-                                    </p>
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={() => setRevokingKeyId(null)}
-                                        className="flex-1 text-xs text-[#c7c4d7]/60 hover:text-[#e4e1ed] px-2 py-1 rounded hover:bg-white/5 transition-colors"
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        onClick={() => handleRevokeKey(key.id)}
-                                        className="flex-1 text-xs text-[#ffb4ab] bg-[#ffb4ab]/10 px-2 py-1 rounded hover:bg-[#ffb4ab]/20 transition-colors"
-                                      >
-                                        Revoke
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                              <button
+                                onClick={() => startRevoke(key)}
+                                className="p-1.5 text-[#c7c4d7]/60 hover:text-[#ffb4ab] hover:bg-white/5 rounded transition-colors"
+                                title="Revoke"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </>
                           )}
                         </div>
@@ -332,92 +365,131 @@ const ApiKeys = () => {
         )}
 
         {/* Create Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        {showCreateModal && !showKeyReveal && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowCreateModal(false);
+              setNewKeyName('');
+              setNewKeyExpiry('never');
+            }}
+          >
+            <div
+              className="glass-panel w-full max-w-md rounded-xl p-6 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-[#e4e1ed] mb-4">Create New API Key</h3>
+              <form onSubmit={handleCreateKey} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                    Key Name
+                  </label>
+                  <input
+                    type="text"
+                    className="rm-input"
+                    placeholder="e.g., Production Key"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                    required
+                    maxLength={100}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
+                    Expiry
+                  </label>
+                  <select
+                    className="rm-input"
+                    value={newKeyExpiry}
+                    onChange={(e) => setNewKeyExpiry(e.target.value)}
+                  >
+                    <option value="30">30 days</option>
+                    <option value="90">90 days</option>
+                    <option value="365">1 year</option>
+                    <option value="never">Never</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewKeyName('');
+                      setNewKeyExpiry('never');
+                    }}
+                    className="flex-1 border border-white/10 text-[#c7c4d7]/60 text-sm rounded px-4 py-2 hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex-1 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {creating ? <LoadingSpinner size="sm" /> : 'Create'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Key Reveal Modal - Cannot be closed by background click */}
+        {showKeyReveal && createdKey && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
             <div className="glass-panel w-full max-w-md rounded-xl p-6 relative">
-              {!showKeyReveal ? (
-                <>
-                  <h3 className="text-lg font-bold text-[#e4e1ed] mb-4">Create New API Key</h3>
-                  <form onSubmit={handleCreateKey} className="space-y-4">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
-                        Key Name
-                      </label>
-                      <input
-                        type="text"
-                        className="rm-input"
-                        placeholder="e.g., Production Key"
-                        value={newKeyName}
-                        onChange={(e) => setNewKeyName(e.target.value)}
-                        required
-                        maxLength={100}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-widest text-[#c7c4d7]/70 mb-1">
-                        Expiry
-                      </label>
-                      <select
-                        className="rm-input"
-                        value={newKeyExpiry}
-                        onChange={(e) => setNewKeyExpiry(e.target.value)}
-                      >
-                        <option value="30">30 days</option>
-                        <option value="90">90 days</option>
-                        <option value="365">1 year</option>
-                        <option value="never">Never</option>
-                      </select>
-                    </div>
-                    <div className="flex gap-3 mt-6">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCreateModal(false);
-                          setNewKeyName('');
-                          setNewKeyExpiry('never');
-                        }}
-                        className="flex-1 border border-white/10 text-[#c7c4d7]/60 text-sm rounded px-4 py-2 hover:bg-white/5 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={creating}
-                        className="flex-1 bg-[#c0c1ff] text-[#1000a9] font-semibold rounded px-4 py-2 text-sm hover:bg-[#d0d1ff] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-                      >
-                        {creating ? <LoadingSpinner size="sm" /> : 'Create'}
-                      </button>
-                    </div>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <div className="text-center mb-4">
-                    <h3 className="text-lg font-bold text-[#e4e1ed]">Save your API key</h3>
-                    <p className="text-sm text-[#ffb95f] mt-1">You won't see it again</p>
-                  </div>
-                  <div className="bg-[#0d0d15] border border-[#c0c1ff]/30 rounded p-4 mb-4">
-                    <code className="text-sm text-[#c0c1ff] break-all block">
-                      {createdKey.key}
-                    </code>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleCopyKey}
-                      className="flex-1 border border-[#c0c1ff]/30 text-[#c0c1ff] text-sm rounded px-4 py-2 hover:bg-[#c0c1ff]/10 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Copy size={14} />
-                      {keyCopied ? 'Copied!' : 'Copy'}
-                    </button>
-                    <button
-                      onClick={handleConfirmKeySaved}
-                      className="flex-1 bg-[#4edea3] text-[#0d1f18] font-semibold rounded px-4 py-2 text-sm hover:bg-[#6eeab5] transition-colors"
-                    >
-                      I've saved it
-                    </button>
-                  </div>
-                </>
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-bold text-[#e4e1ed]">Save your API key</h3>
+                <p className="text-sm text-[#ffb95f] mt-1">You won't see it again</p>
+              </div>
+              <div className="bg-[#0d0d15] border border-[#c0c1ff]/30 rounded p-4 mb-4">
+                <code className="text-sm text-[#c0c1ff] break-all block">
+                  {createdKey.key}
+                </code>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCopyKey}
+                  className="flex-1 border border-[#c0c1ff]/30 text-[#c0c1ff] text-sm rounded px-4 py-2 hover:bg-[#c0c1ff]/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy size={14} />
+                  {keyCopied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={handleConfirmKeySaved}
+                  className="flex-1 bg-[#4edea3] text-[#0d1f18] font-semibold rounded px-4 py-2 text-sm hover:bg-[#6eeab5] transition-colors"
+                >
+                  I've saved it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Revoke Confirmation Modal */}
+        {showRevokeModal && revokingKeyId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+            <div className="glass-panel w-full max-w-md rounded-xl p-6 relative">
+              <h3 className="text-lg font-bold text-[#e4e1ed] mb-2">Revoke API Key</h3>
+              {keys.find(k => k.id === revokingKeyId) && (
+                <p className="text-sm text-[#c7c4d7]/80 mb-6">
+                  Are you sure you want to revoke "{keys.find(k => k.id === revokingKeyId).name}"? This action cannot be undone.
+                </p>
               )}
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelRevoke}
+                  className="flex-1 border border-white/10 text-[#c7c4d7]/60 text-sm rounded px-4 py-2 hover:bg-white/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRevokeKey(revokingKeyId)}
+                  className="flex-1 bg-[#ffb4ab] text-[#1a0a0a] font-semibold rounded px-4 py-2 text-sm hover:bg-[#ff6b6b] transition-colors"
+                >
+                  Revoke
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -21,3 +21,8 @@ export const getChargebackStatus = (transactionId) =>
   client.get(`/v1/chargebacks/${transactionId}/status`, {
     headers: { 'X-API-Key': getApiKey() }
   });
+
+export const getTransactionDetail = (transactionId) =>
+  client.get(`/v1/transactions/${transactionId}`, {
+    headers: { 'X-API-Key': getApiKey() }
+  });

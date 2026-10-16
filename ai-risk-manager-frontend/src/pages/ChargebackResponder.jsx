@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { ShieldCheck, Sparkles, Info, CheckSquare, Copy } from 'lucide-react';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { Info, CheckSquare, Copy } from 'lucide-react';
 import apiClient from '../api/client';
 
 const ChargebackResponder = () => {
@@ -93,15 +93,30 @@ const ChargebackResponder = () => {
 
   return (
     <Layout title="Chargeback Responder">
-      <div className="space-y-6">
-        {/* Top Section - Evidence Request Form */}
-        <div className="glass-panel rounded-lg p-6">
-          <h3 className="text-[#e4e1ed] font-semibold text-base mb-1">Generate Dispute Evidence</h3>
-          <p className="text-sm text-[#c7c4d7]/70 mb-4">
-            AI will compile an evidence package to contest this chargeback
-          </p>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-[#4edea3]/20 rounded-xl">
+            <ShieldCheck size={24} className="text-[#4edea3]" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-[#e4e1ed]">Chargeback Responder</h2>
+            <p className="text-sm text-[#c7c4d7]/60">AI-powered dispute evidence generation</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Top Section - Evidence Request Form */}
+          <div className="glass-panel rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Sparkles size={18} className="text-[#4edea3]" />
+              <h3 className="text-[#e4e1ed] font-semibold text-base">Generate Dispute Evidence</h3>
+            </div>
+            <p className="text-sm text-[#c7c4d7]/70 mb-4">
+              AI will compile an evidence package to contest this chargeback
+            </p>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
             {/* Row 1: Transaction ID | Amount */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -113,7 +128,7 @@ const ChargebackResponder = () => {
                   name="transaction_id"
                   value={formData.transaction_id}
                   onChange={handleInputChange}
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
                 {errors.transaction_id && (
                   <p className="text-xs text-[#ffb4ab] mt-1">{errors.transaction_id}</p>
@@ -129,7 +144,7 @@ const ChargebackResponder = () => {
                   value={formData.amount}
                   onChange={handleInputChange}
                   step="0.01"
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
                 {errors.amount && (
                   <p className="text-xs text-[#ffb4ab] mt-1">{errors.amount}</p>
@@ -149,7 +164,7 @@ const ChargebackResponder = () => {
                   value={formData.chargeback_reason_code}
                   onChange={handleInputChange}
                   placeholder="4853"
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
                 {errors.chargeback_reason_code && (
                   <p className="text-xs text-[#ffb4ab] mt-1">{errors.chargeback_reason_code}</p>
@@ -165,7 +180,7 @@ const ChargebackResponder = () => {
                   value={formData.dispute_deadline}
                   onChange={handleInputChange}
                   min={getTodayDate()}
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
                 {errors.dispute_deadline && (
                   <p className="text-xs text-[#ffb4ab] mt-1">{errors.dispute_deadline}</p>
@@ -177,7 +192,7 @@ const ChargebackResponder = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#c0c1ff] text-[#1000a9] font-semibold py-2.5 rounded hover:bg-[#a0a1e0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-[#4edea3] text-[#0d1f18] font-semibold py-3 rounded-xl hover:bg-[#6eeab5] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -190,9 +205,9 @@ const ChargebackResponder = () => {
             </button>
 
             {/* Info Banner */}
-            <div className="bg-[#c0c1ff]/5 border border-[#c0c1ff]/20 rounded p-3 flex gap-2 items-start">
-              <Info size={16} className="text-[#c0c1ff] flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-[#c7c4d7]">
+            <div className="bg-[#4edea3]/5 border border-[#4edea3]/20 rounded-xl p-4 flex gap-3 items-start">
+              <Info size={18} className="text-[#4edea3] flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[#c7c4d7]">
                 Evidence generation uses AI and may take 5–10 seconds. The package includes a dispute narrative, supporting document checklist, and recommended response strategy.
               </p>
             </div>
@@ -201,12 +216,15 @@ const ChargebackResponder = () => {
 
         {/* Bottom Section - Evidence Package Result */}
         {result && !apiError && (
-          <div className="glass-panel rounded-lg p-6">
+          <div className="glass-panel rounded-xl p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[#e4e1ed] font-semibold text-base">Evidence Package Ready</h3>
+              <div className="flex items-center gap-2">
+                <CheckSquare size={20} className="text-[#4edea3]" />
+                <h3 className="text-[#e4e1ed] font-semibold text-base">Evidence Package Ready</h3>
+              </div>
               {result.confidence && (
-                <div className="bg-[#4edea3]/10 border border-[#4edea3]/30 px-3 py-1 rounded-full">
+                <div className="bg-[#4edea3]/10 border border-[#4edea3]/30 px-4 py-1.5 rounded-full">
                   <span className="text-xs font-semibold text-[#4edea3]">
                     {result.confidence}% Confidence
                   </span>
@@ -219,7 +237,7 @@ const ChargebackResponder = () => {
               <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-2">
                 Evidence Summary
               </label>
-              <div className="bg-[#0d0d15] rounded p-4 border-l-2 border-[#4edea3]">
+              <div className="bg-[#0d0d15] rounded-xl p-4 border-l-4 border-[#4edea3]">
                 <p className="text-sm text-[#e4e1ed] italic">
                   {result.evidence_summary || 'No summary provided'}
                 </p>
@@ -229,16 +247,16 @@ const ChargebackResponder = () => {
             {/* Evidence Documents Checklist */}
             {result.evidence_documents && result.evidence_documents.length > 0 && (
               <div className="mb-6">
-                <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-2">
+                <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-3">
                   Evidence Documents Checklist
                 </label>
                 <div className="space-y-0">
                   {result.evidence_documents.map((doc, index) => (
                     <div 
                       key={index} 
-                      className="flex items-center gap-2 py-2 border-b border-white/5 text-sm text-[#e4e1ed]"
+                      className="flex items-center gap-3 py-3 border-b border-white/5 text-sm text-[#e4e1ed] bg-[#0d0d15] px-4 rounded-lg"
                     >
-                      <CheckSquare size={14} className="text-[#4edea3] flex-shrink-0" />
+                      <CheckSquare size={16} className="text-[#4edea3] flex-shrink-0" />
                       <span>{doc}</span>
                     </div>
                   ))}
@@ -249,17 +267,19 @@ const ChargebackResponder = () => {
             {/* Recommended Response */}
             {result.recommended_response && (
               <div>
-                <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-2">
+                <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-3">
                   Recommended Response
                 </label>
                 <div className="space-y-3">
-                  <p className="text-sm text-[#e4e1ed]">
-                    {result.recommended_response}
-                  </p>
+                  <div className="bg-[#0d0d15] rounded-xl p-4">
+                    <p className="text-sm text-[#e4e1ed]">
+                      {result.recommended_response}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={handleCopyResponse}
-                    className="text-sm text-[#c7c4d7]/60 hover:text-[#c0c1ff] transition-colors flex items-center gap-1"
+                    className="text-sm text-[#c7c4d7]/60 hover:text-[#4edea3] transition-colors flex items-center gap-2"
                   >
                     <Copy size={14} />
                     {copied ? 'Copied!' : 'Copy Response'}
@@ -269,7 +289,7 @@ const ChargebackResponder = () => {
             )}
 
             {/* Footer */}
-            <div className="text-xs text-[#c7c4d7]/40 pt-4 border-t border-[#464554] mt-6">
+            <div className="text-xs text-[#c7c4d7]/40 pt-4 border-t border-white/10 mt-6">
               Model: {result.model_version || 'Unknown'} · {result.latency_ms || 0}ms
             </div>
           </div>
@@ -277,12 +297,13 @@ const ChargebackResponder = () => {
 
         {/* Error State */}
         {apiError && (
-          <div className="glass-panel rounded-lg p-6">
-            <div className="border border-[#ffb4ab] rounded-lg p-4 bg-[#ffb4ab]/10">
+          <div className="glass-panel rounded-xl p-6">
+            <div className="border border-[#ffb4ab] rounded-xl p-4 bg-[#ffb4ab]/10">
               <p className="text-[#ffb4ab] text-sm">{apiError}</p>
             </div>
           </div>
         )}
+      </div>
       </div>
     </Layout>
   );

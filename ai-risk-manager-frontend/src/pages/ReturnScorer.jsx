@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { Package, Sparkles } from 'lucide-react';
 import Layout from '../components/Layout';
 import StatusChip from '../components/StatusChip';
 import ScoreBar from '../components/ScoreBar';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { Package } from 'lucide-react';
 import apiClient from '../api/client';
 
 const ReturnScorer = () => {
@@ -112,13 +112,28 @@ const ReturnScorer = () => {
 
   return (
     <Layout title="Return Risk Scorer">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left Column - Form (45%) */}
-        <div className="lg:col-span-[9/20]">
-          <div className="glass-panel rounded-lg p-6">
-            <h3 className="text-[#e4e1ed] font-semibold text-base mb-4">Analyze Transaction</h3>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-[#ffb95f]/20 rounded-xl">
+            <Package size={24} className="text-[#ffb95f]" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-[#e4e1ed]">Return Risk Scorer</h2>
+            <p className="text-sm text-[#c7c4d7]/60">Predict return probability for transactions</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left Column - Form (45%) */}
+          <div className="lg:col-span-[9/20]">
+            <div className="glass-panel rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles size={18} className="text-[#ffb95f]" />
+                <h3 className="text-[#e4e1ed] font-semibold text-base">Transaction Details</h3>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
               {/* Row 1: Transaction ID | Customer ID */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -130,7 +145,7 @@ const ReturnScorer = () => {
                     name="transaction_id"
                     value={formData.transaction_id}
                     onChange={handleInputChange}
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   />
                   {errors.transaction_id && (
                     <p className="text-xs text-[#ffb4ab] mt-1">{errors.transaction_id}</p>
@@ -145,7 +160,7 @@ const ReturnScorer = () => {
                     name="customer_id"
                     value={formData.customer_id}
                     onChange={handleInputChange}
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   />
                   {errors.customer_id && (
                     <p className="text-xs text-[#ffb4ab] mt-1">{errors.customer_id}</p>
@@ -165,7 +180,7 @@ const ReturnScorer = () => {
                     value={formData.amount}
                     onChange={handleInputChange}
                     step="0.01"
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   />
                   {errors.amount && (
                     <p className="text-xs text-[#ffb4ab] mt-1">{errors.amount}</p>
@@ -179,7 +194,7 @@ const ReturnScorer = () => {
                     name="currency"
                     value={formData.currency}
                     onChange={handleInputChange}
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   >
                     <option value="INR">INR</option>
                     <option value="USD">USD</option>
@@ -202,7 +217,7 @@ const ReturnScorer = () => {
                   name="ip_address"
                   value={formData.ip_address}
                   onChange={handleInputChange}
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
                 {errors.ip_address && (
                   <p className="text-xs text-[#ffb4ab] mt-1">{errors.ip_address}</p>
@@ -219,7 +234,7 @@ const ReturnScorer = () => {
                     name="payment_method"
                     value={formData.payment_method}
                     onChange={handleInputChange}
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   >
                     <option value="">Select method</option>
                     <option value="card">Card</option>
@@ -238,7 +253,7 @@ const ReturnScorer = () => {
                     value={formData.merchant_category_code}
                     onChange={handleInputChange}
                     placeholder="5411"
-                    className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                    className="rm-input"
                   />
                   {errors.merchant_category_code && (
                     <p className="text-xs text-[#ffb4ab] mt-1">{errors.merchant_category_code}</p>
@@ -257,7 +272,7 @@ const ReturnScorer = () => {
                   value={formData.device_id}
                   onChange={handleInputChange}
                   placeholder="Leave blank if unknown"
-                  className="bg-[#0d0d15] border border-[#464554] text-[#e4e1ed] rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#c0c1ff] focus:border-[#c0c1ff] outline-none w-full"
+                  className="rm-input"
                 />
               </div>
 
@@ -280,7 +295,7 @@ const ReturnScorer = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#c0c1ff] text-[#1000a9] font-semibold py-2.5 rounded mt-4 hover:bg-[#a0a1e0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-[#ffb95f] text-[#1a0f00] font-semibold py-3 rounded-xl mt-6 hover:bg-[#e6a658] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -306,18 +321,20 @@ const ReturnScorer = () => {
 
         {/* Right Column - Result Panel (55%) */}
         <div className="lg:col-span-[11/20]">
-          <div className="glass-panel rounded-lg p-6 h-full">
+          <div className="glass-panel rounded-xl p-6 h-full">
             {!result && !apiError && (
               /* Placeholder State */
               <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-                <Package size={48} className="text-[#464554] mb-4" />
+                <div className="p-4 bg-[#1f1f27] rounded-full mb-4">
+                  <Package size={32} className="text-[#464554]" />
+                </div>
                 <p className="text-[#c7c4d7]/50 text-sm">Submit a transaction to score return risk</p>
               </div>
             )}
 
             {apiError && (
               /* Error State */
-              <div className="border border-[#ffb4ab] rounded-lg p-4 bg-[#ffb4ab]/10">
+              <div className="border border-[#ffb4ab] rounded-xl p-4 bg-[#ffb4ab]/10">
                 <p className="text-[#ffb4ab] text-sm">{apiError}</p>
               </div>
             )}
@@ -326,11 +343,11 @@ const ReturnScorer = () => {
               /* Result State */
               <div className="space-y-6">
                 {/* Risk Band Badge */}
-                <div className="flex justify-center">
+                <div className="flex justify-center py-4">
                   <div className="transform scale-125">
                     <StatusChip 
                       status={result.risk_band} 
-                      className="text-base px-4 py-1.5"
+                      className="text-base px-6 py-2"
                     />
                   </div>
                 </div>
@@ -347,7 +364,7 @@ const ReturnScorer = () => {
                     Return Probability
                   </label>
                   <div 
-                    className="text-4xl font-bold"
+                    className="text-5xl font-bold"
                     style={{ color: getReturnProbabilityColor(result.return_risk_score || 0) }}
                   >
                     {((result.return_risk_score || 0) * 100).toFixed(0)}%
@@ -357,12 +374,12 @@ const ReturnScorer = () => {
                 {/* Recommended Actions */}
                 {result.recommended_actions && result.recommended_actions.length > 0 && (
                   <div>
-                    <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-2">
+                    <label className="block text-[11px] uppercase tracking-widest text-[#c7c4d7]/70 mb-3">
                       Recommended Actions
                     </label>
                     <div className="space-y-2">
                       {result.recommended_actions.map((action, index) => (
-                        <div key={index} className="flex items-start gap-2 text-sm text-[#e4e1ed]">
+                        <div key={index} className="flex items-start gap-3 text-sm text-[#e4e1ed] bg-[#0d0d15] p-3 rounded-lg">
                           <div 
                             className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                             style={{ backgroundColor: getBulletColor(result.risk_band) }}
@@ -375,13 +392,14 @@ const ReturnScorer = () => {
                 )}
 
                 {/* Footer */}
-                <div className="text-xs text-[#c7c4d7]/40 pt-4 border-t border-[#464554]">
+                <div className="text-xs text-[#c7c4d7]/40 pt-4 border-t border-white/10">
                   Model: {result.model_version || 'Unknown'} · {result.latency_ms || 0}ms
                 </div>
               </div>
             )}
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

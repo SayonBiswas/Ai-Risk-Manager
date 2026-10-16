@@ -7,6 +7,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ApiKeys from './pages/ApiKeys';
 import Dashboard from './pages/Dashboard';
+import TransactionDetail from './pages/TransactionDetail';
 import FraudDetect from './pages/FraudDetect';
 import ReturnScorer from './pages/ReturnScorer';
 import ChargebackResponder from './pages/ChargebackResponder';
@@ -38,10 +39,11 @@ const AppContent = () => (
       <PrivateRoute requireKey={false}><ApiKeys /></PrivateRoute>
     } />
 
-    <Route path="/dashboard"    element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-    <Route path="/fraud"        element={<PrivateRoute><FraudDetect /></PrivateRoute>} />
-    <Route path="/returns"      element={<PrivateRoute><ReturnScorer /></PrivateRoute>} />
-    <Route path="/chargebacks"  element={<PrivateRoute><ChargebackResponder /></PrivateRoute>} />
+    <Route path="/dashboard"           element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+    <Route path="/transactions/:id"    element={<PrivateRoute><TransactionDetail /></PrivateRoute>} />
+    <Route path="/fraud"               element={<PrivateRoute><FraudDetect /></PrivateRoute>} />
+    <Route path="/returns"             element={<PrivateRoute><ReturnScorer /></PrivateRoute>} />
+    <Route path="/chargebacks"         element={<PrivateRoute><ChargebackResponder /></PrivateRoute>} />
 
     {/* Catch-all route for 404 */}
     <Route path="*" element={<NotFound />} />

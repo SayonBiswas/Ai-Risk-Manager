@@ -48,6 +48,7 @@ export const useTransactionList = (filters = {}) => {
           decision: filters.decision || undefined,
           from_date: filters.from_date || undefined,
           to_date: filters.to_date || undefined,
+          search: filters.search || undefined,
         },
       });
       setData(response.data);
@@ -57,7 +58,7 @@ export const useTransactionList = (filters = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [filters.page, filters.limit, filters.decision, filters.from_date, filters.to_date]);
+  }, [filters.page, filters.limit, filters.decision, filters.from_date, filters.to_date, filters.search]);
 
   useEffect(() => {
     fetchTransactions();

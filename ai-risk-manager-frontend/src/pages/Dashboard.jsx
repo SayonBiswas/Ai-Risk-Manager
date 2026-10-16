@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, ShieldOff, AlertTriangle, TrendingDown, TrendingUp, RefreshCw
 } from 'lucide-react';
@@ -7,6 +8,8 @@ import {
 } from 'recharts';
 import Layout from '../components/Layout';
 import StatusChip from '../components/StatusChip';
+import TransactionFilters from '../components/TransactionFilters';
+import Pagination from '../components/Pagination';
 import { useTransactionStats, useTransactionList } from '../hooks/useTransactions';
 
 // Helper to format date to day name
@@ -87,9 +90,52 @@ const StatCard = ({ icon: Icon, iconColor, value, valueColor, label, sub, trend,
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [visible, setVisible] = useState(false);
+
+  // Initialize filters from URL params
+  const [filters, setFilters] = useState({
+    page: parseInt(searchParams.get('page')) || 1,
+    limit: 20,
+    decision: searchParams.get('decision') || null,
+    from_date: searchParams.get('from_date') || null,
+    to_date: searchParams.get('to_date') || null,
+    search: searchParams.get('search') || null,
+  });
+
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useTransactionStats();
-  const { data, loading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useTransactionList({ limit: 12 });
+  const { data, loading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useTransactionList(filters);
+
+  // Sync filters to URL params
+  useEffect(() => {
+    const params = {};
+    if (filters.page && filters.page > 1) params.page = filters.page;
+    if (filters.decision) params.decision = filters.decision;
+    if (filters.from_date) params.from_date = filters.from_date;
+    if (filters.to_date) params.to_date = filters.to_date;
+    if (filters.search) params.search = filters.search;
+    setSearchParams(params);
+  }, [filters, setSearchParams]);
+
+  const handleFilterChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+  }, []);
+
+  const handleClearFilters = () => {
+    setFilters({
+      page: 1,
+      limit: 20,
+      decision: null,
+      from_date: null,
+      to_date: null,
+      search: null,
+    });
+  };
+
+  const handlePageChange = (newPage) => {
+    setFilters({ ...filters, page: newPage });
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 800);
@@ -195,9 +241,15 @@ const Dashboard = () => {
         {/* Recent decisions table */}
         <div className="col-span-3 glass-panel rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[#e4e1ed] font-semibold text-sm">Recent Decisions</p>
-            <p className="text-xs text-[#c7c4d7]/50">Last 12 transactions</p>
+            <p className="text-[#e4e1ed] font-semibold text-sm">Transactions</p>
           </div>
+
+          {/* Filters */}
+          <TransactionFilters
+            filters={filters}
+            onChange={handleFilterChange}
+            onClear={handleClearFilters}
+          />
           
           {transactionsLoading ? (
             <div className="space-y-3">
@@ -208,45 +260,60 @@ const Dashboard = () => {
           ) : data?.items?.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-[#c7c4d7]/50">No transactions found</p>
+              <p className="text-xs text-[#c7c4d7]/30 mt-1">Try adjusting your filters</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/5">
-                  {['TXN ID', 'Amount', 'Method', 'Decision', 'Fraud Score', 'Time'].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 font-medium"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data?.items?.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors"
-                  >
-                    <td className="py-3 font-mono text-xs text-[#c7c4d7]">
-                      {row.id.slice(0, 8).toUpperCase()}
-                    </td>
-                    <td className="py-3 text-[#e4e1ed]">
-                      {formatAmount(Number(row.amount), row.currency)}
-                    </td>
-                    <td className="py-3 text-[#c7c4d7]/70 capitalize">{row.payment_method}</td>
-                    <td className="py-3"><StatusChip status={row.decision} /></td>
-                    <td className="py-3 font-mono text-xs" style={{ color: scoreColor(row.fraud_score) }}>
-                      {row.fraud_score.toFixed(2)}
-                    </td>
-                    <td className="py-3 text-xs text-[#c7c4d7]/40">
-                      {formatTimeAgo(row.created_at)}
-                    </td>
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {['TXN ID', 'Amount', 'Method', 'Decision', 'Fraud Score', 'Time'].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left text-[10px] uppercase tracking-widest text-[#c7c4d7]/50 pb-3 font-medium"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data?.items?.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => navigate(`/transactions/${row.id}`)}
+                      className="border-b border-white/5 last:border-0 hover:bg-white/[0.05] transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 font-mono text-xs text-[#c7c4d7]">
+                        {row.id.slice(0, 8).toUpperCase()}
+                      </td>
+                      <td className="py-3 text-[#e4e1ed]">
+                        {formatAmount(Number(row.amount), row.currency)}
+                      </td>
+                      <td className="py-3 text-[#c7c4d7]/70 capitalize">{row.payment_method}</td>
+                      <td className="py-3"><StatusChip status={row.decision} /></td>
+                      <td className="py-3 font-mono text-xs" style={{ color: scoreColor(row.fraud_score) }}>
+                        {row.fraud_score.toFixed(2)}
+                      </td>
+                      <td className="py-3 text-xs text-[#c7c4d7]/40">
+                        {formatTimeAgo(row.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {!transactionsLoading && data && (
+                <Pagination
+                  currentPage={data.page}
+                  totalPages={data.pages}
+                  total={data.total}
+                  limit={filters.limit}
+                  onPageChange={handlePageChange}
+                />
+              )}
+            </>
           )}
         </div>
 
